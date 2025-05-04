@@ -14,7 +14,7 @@ export default function CoursePage() {
         <div className="grid gap-6">
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <div className="w-full">
-            <CourseCards />
+            <CourseCards/>
           </div>
         </div>
       </main>
