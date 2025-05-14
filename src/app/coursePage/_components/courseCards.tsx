@@ -82,7 +82,7 @@ const courses = [
 export function CourseCards() {
   return (
     <>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between color:red">
         <h2 className="text-xl font-semibold">Courses</h2>
         <Link
           href="/courses"
