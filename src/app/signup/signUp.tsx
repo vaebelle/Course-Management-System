@@ -39,14 +39,15 @@ export default function Signup() {
               <Separator className="my-2" />
             </CardHeader>
             <CardContent className="space-y-5 -mt-8">
-                <Input type="email" placeholder="Name"/>
+                <Input type="email" placeholder="First Name"/>
+                <Input type="email" placeholder="Last Name"/>
                 <Input type="email" placeholder="Email"/>
                 <Input type="password" placeholder="Password" />
                 <Input type="password" placeholder="Confirm password" />
                 <Button className="rounded-lg mt-4 w-full bg-black text-white border border-transparent hover:bg-white hover:text-black hover:border-black transition-colors duration-200">
                     Signup
                 </Button>
-              <p className="text-center text-sm pt-6 mt-6">
+              <p className="text-center text-sm pt-6">
                 You already have an account?{" "}
                 <Link href="/" className="text-green-900">
                   Log in.

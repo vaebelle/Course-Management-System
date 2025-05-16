@@ -6,8 +6,8 @@ export default function Main() {
   return (
     <>
     {/* <CourseCards /> */}
-    <Login />
-    {/* <SignUp /> */}
+    {/* <Login /> */}
+    <SignUp />
     </>
    
   );
