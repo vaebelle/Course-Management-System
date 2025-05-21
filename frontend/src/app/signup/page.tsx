@@ -1,18 +1,15 @@
-import { CourseCards } from "../coursePage/_components/courseCards";
 import Link from "next/link";
-import Image from "next/image";
 
 import {
   Card,
   CardContent,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "../../components/ui/card";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "../../components/ui/separator";
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 
 export default function Signup() {
   return (
@@ -35,22 +32,24 @@ export default function Signup() {
         <div className="w-full md:w-1/2 flex items-center justify-center p-6">
           <Card className="w-full max-w-md shadow-xl p-7">
             <CardHeader className="pb-8">
-              <CardTitle className="text-[18px] text-left pt-5 font-bold">SIGNUP</CardTitle>
+              <CardTitle className="text-[18px] text-left pt-5 font-bold">
+                SIGNUP
+              </CardTitle>
               <Separator className="my-2" />
             </CardHeader>
             <CardContent className="space-y-5 -mt-8">
-                <Input type="text" placeholder="ID Number"/>
-                <Input type="text" placeholder="First Name"/>
-                <Input type="text" placeholder="Last Name"/>
-                <Input type="email" placeholder="Email"/>
-                <Input type="password" placeholder="Password" />
-                <Input type="password" placeholder="Confirm password" />
-                <Button className="rounded-lg mt-4 w-full bg-black text-white border border-transparent hover:bg-white hover:text-black hover:border-black transition-colors duration-200">
-                    Signup
-                </Button>
+              <Input type="text" placeholder="ID Number" />
+              <Input type="text" placeholder="First Name" />
+              <Input type="text" placeholder="Last Name" />
+              <Input type="email" placeholder="Email" />
+              <Input type="password" placeholder="Password" />
+              <Input type="password" placeholder="Confirm password" />
+              <Button className="rounded-lg mt-4 w-full bg-black text-white border border-transparent hover:bg-white hover:text-black hover:border-black transition-colors duration-200">
+                Signup
+              </Button>
               <p className="text-center text-sm pt-6">
                 You already have an account?{" "}
-                <Link href="/" className="text-green-900">
+                <Link href="/login" passHref className="text-green-900">
                   Log in.
                 </Link>
               </p>
