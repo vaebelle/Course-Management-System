@@ -11,6 +11,7 @@ import { Dialog,
         DialogTrigger } from "../../../components/ui/dialog"
 import { Input } from "../../../components/ui/input"
 import { LogOut, Upload } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 interface CourseNavbarProps{
     instructorName?: string
@@ -18,6 +19,7 @@ interface CourseNavbarProps{
 
 export default function CourseNavBar({instructorName = "Bea Belle Therese Caños"}: CourseNavbarProps){
     const[isUploading, setIsUploading] = useState(false)
+    const router = useRouter();
 
     const handleFileChange = (E: React.ChangeEvent<HTMLInputElement>) => {
         const file = E.target.files?.[0]
@@ -32,7 +34,7 @@ export default function CourseNavBar({instructorName = "Bea Belle Therese Caños
     }
 
     const handleLogout = () => {
-        //no logout logic yet for now huehue
+        router.push("/");
         alert("Logging out")
     }
 
