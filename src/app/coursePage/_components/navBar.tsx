@@ -3,6 +3,7 @@
 import type React from "react";
 
 import { LogOut, Upload, User } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
@@ -52,6 +53,13 @@ export default function CourseNavBar({
           </div>
 
           <div className="flex items-center space-x-4">
+            <Link href="/coursePage" passHref>
+              <Button className="flex items-center gap-2 bg-[#ffffff] hover:bg-[#e0e0e0] text-black">
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </Button>
+            </Link>
+
             <Dialog>
               <DialogTrigger asChild>
                 <Button
@@ -86,13 +94,12 @@ export default function CourseNavBar({
               </DialogContent>
             </Dialog>
 
-            <Button
-              onClick={handleLogout}
-              className="flex items-center gap-2 bg-[#ffffff] hover:bg-[#e0e0e0] text-black"
-            >
-              <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Activity Log</span>
-            </Button>
+            <Link href="/activitylog" passHref>
+              <Button className="flex items-center gap-2 bg-[#ffffff] hover:bg-[#e0e0e0] text-black">
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">Activity Log</span>
+              </Button>
+            </Link>
 
             <Button
               onClick={handleLogout}
