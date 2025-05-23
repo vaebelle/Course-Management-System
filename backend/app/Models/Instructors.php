@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
-class instructor extends Model
+class Instructors extends Authenticatable
 {
-    use HasFactory;
+    use HasFactory, Notifiable, HasApiTokens;
 
+    protected $table = 'instructors';
     protected $primaryKey = 'teacher_id';
     public $incrementing = false;
     protected $keyType = 'integer';
@@ -23,10 +26,12 @@ class instructor extends Model
 
     protected $hidden = [
         'password',
+        'remember_token',
     ];
 
     protected $casts = [
         'teacher_id' => 'integer',
+        'email_verified_at' => 'datetime',
     ];
 
     /**
