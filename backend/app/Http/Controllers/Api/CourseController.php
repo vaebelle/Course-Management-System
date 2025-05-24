@@ -31,8 +31,8 @@ class CourseController extends Controller
                         'instructorName' => $course->instructor 
                             ? $course->instructor->first_name . ' ' . $course->instructor->last_name 
                             : 'No Instructor Assigned',
-                        'semester' => '2ND SEMESTER AY 2024-2025', 
-                        'group' => 'Group 3', 
+                        'semester' => '2ND SEMESTER AY 2024-2025', // You might want to add this to your database
+                        'group' => 'Group 3', // You might want to add this to your database
                         'color' => 'bg-blue-500',
                         'created_at' => $course->created_at,
                         'updated_at' => $course->updated_at,
