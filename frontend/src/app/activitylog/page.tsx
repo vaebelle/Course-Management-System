@@ -2,7 +2,7 @@ import { Card } from "../../components/ui/card";
 import CourseNavBar from "../coursePage/_components/navBar";
 import ActivityList from "./components/logs";
 
-export default function CoursePage() {
+export default function ActivityLog() {
   return (
     <>
       <CourseNavBar instructorName="Bea Belle Therese B. Caños" />

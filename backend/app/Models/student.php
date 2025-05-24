@@ -19,6 +19,9 @@ class Student extends Model
         'last_name',
         'program',
         'enrolled_course',
+        'created_at',
+        'updated_at',
+        'deleted_at'
     ];
 
     protected $casts = [

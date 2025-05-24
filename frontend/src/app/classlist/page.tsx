@@ -3,7 +3,7 @@ import CourseNavBar from "../coursePage/_components/navBar";
 import Search from "./components/search";
 import StudentList from "./components/studentlist";
 
-export default function CoursePage() {
+export default function ClassList() {
   return (
     <>
       <CourseNavBar instructorName="Bea Belle Therese B. Caños" />
