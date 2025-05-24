@@ -13,16 +13,44 @@ import { useState, useEffect } from "react";
 
 interface ActivityEntry {
   id: string;
-  courseCode: string;
-  createdAt: string;
+  type: 'course' | 'student';
+  action: 'created' | 'updated' | 'deleted' | 'restored';
+  timestamp: string;
   formattedDate: string;
   formattedTime: string;
+  description: string;
+  details?: string;
 }
 
-interface ApiResponse {
+interface Student {
+  student_id: string;
+  first_name: string;
+  last_name: string;
+  program: string;
+  enrolled_course: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+}
+
+interface Course {
+  id: string;
+  courseCode: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ApiResponse<T> {
   success: boolean;
-  data: any[];
+  data: T;
   message: string;
+}
+
+interface PaginatedStudentResponse {
+  data: Student[];
+  total: number;
+  per_page: number;
+  current_page: number;
 }
 
 export default function ActivityList() {
@@ -30,67 +58,163 @@ export default function ActivityList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Replace with your Laravel backend URL
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/instructor/activitylog';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
-    fetchCourseActivities();
+    fetchAllActivities();
   }, []);
 
-  const fetchCourseActivities = async () => {
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return {
+      formattedDate: date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: 'Asia/Manila'
+      }),
+      formattedTime: date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Manila'
+      })
+    };
+  };
+
+  const fetchAllActivities = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/courses`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
+      setError(null);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Fetch courses and students in parallel
+      const [coursesResponse, studentsResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/courses`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        }),
+        fetch(`${API_BASE_URL}/students?include_deleted=true&per_page=1000`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        })
+      ]);
+
+      if (!coursesResponse.ok) {
+        throw new Error(`Courses API error! status: ${coursesResponse.status}`);
       }
 
-      const result: ApiResponse = await response.json();
+      if (!studentsResponse.ok) {
+        throw new Error(`Students API error! status: ${studentsResponse.status}`);
+      }
 
-      if (result.success) {
-        // Transform course data into activity entries
-        const activityEntries = result.data.map((course) => {
-          const createdDate = new Date(course.created_at);
+      const coursesResult: ApiResponse<Course[]> = await coursesResponse.json();
+      const studentsResult: ApiResponse<PaginatedStudentResponse> = await studentsResponse.json();
+
+      const allActivities: ActivityEntry[] = [];
+
+      // Process course activities
+      if (coursesResult.success && Array.isArray(coursesResult.data)) {
+        coursesResult.data.forEach((course) => {
+          const { formattedDate, formattedTime } = formatDateTime(course.created_at);
           
-          return {
-            id: course.id,
-            courseCode: course.courseCode,
-            createdAt: course.created_at,
-            formattedDate: createdDate.toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              timeZone: 'Asia/Manila' // Set to your timezone
-            }),
-            formattedTime: createdDate.toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              hour12: true,
-              timeZone: 'Asia/Manila' // Set to your timezone
-            })
-          };
+          allActivities.push({
+            id: `course-${course.id}-created`,
+            type: 'course',
+            action: 'created',
+            timestamp: course.created_at,
+            formattedDate,
+            formattedTime,
+            description: `Created Course: ${course.courseCode}`,
+            details: `Course Code: ${course.courseCode}`
+          });
         });
-
-        // Sort by creation date (newest first)
-        activityEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        
-        setActivities(activityEntries);
-      } else {
-        setError(result.message || 'Failed to fetch activities');
       }
+
+      // Process student activities
+      if (studentsResult.success && studentsResult.data?.data) {
+        studentsResult.data.data.forEach((student) => {
+          const studentName = `${student.first_name} ${student.last_name}`;
+          const id_number = `${student.student_id}`;
+          
+          // Student updated activity (only if updated_at is different from created_at)
+          if (student.updated_at !== student.created_at) {
+            const updatedDateTime = formatDateTime(student.updated_at);
+            allActivities.push({
+              id: `student-${student.student_id}-updated`,
+              type: 'student',
+              action: 'updated',
+              timestamp: student.updated_at,
+              formattedDate: updatedDateTime.formattedDate,
+              formattedTime: updatedDateTime.formattedTime,
+              description: `Student Updated: ${id_number} - ${studentName}`,
+              details: `ID: ${student.student_id}, Changes to student information`
+            });
+          }
+
+          // Student deleted activity (if soft deleted)
+          if (student.deleted_at) {
+            const deletedDateTime = formatDateTime(student.deleted_at);
+            allActivities.push({
+              id: `student-${student.student_id}-deleted`,
+              type: 'student',
+              action: 'deleted',
+              timestamp: student.deleted_at,
+              formattedDate: deletedDateTime.formattedDate,
+              formattedTime: deletedDateTime.formattedTime,
+              description: `Student Deleted: ${studentName}`,
+              details: `ID: ${student.student_id}, Soft deleted from system`
+            });
+          }
+        });
+      }
+
+      // Sort all activities by timestamp (newest first)
+      allActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      setActivities(allActivities);
+
     } catch (err) {
-      console.error('Error fetching course activities:', err);
+      console.error('Error fetching activities:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch activities');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getActionColor = (action: string) => {
+    switch (action) {
+      case 'created':
+        return 'text-green-600 bg-green-50';
+      case 'updated':
+        return 'text-blue-600 bg-blue-50';
+      case 'deleted':
+        return 'text-red-600 bg-red-50';
+      case 'restored':
+        return 'text-purple-600 bg-purple-50';
+      default:
+        return 'text-gray-600 bg-gray-50';
+    }
+  };
+
+  const getActionIcon = (action: string) => {
+    switch (action) {
+      case 'created':
+        return '✅';
+      case 'updated':
+        return '✏️';
+      case 'deleted':
+        return '🗑️';
+      case 'restored':
+        return '♻️';
+      default:
+        return '📝';
     }
   };
 
@@ -112,7 +236,7 @@ export default function ActivityList() {
         <div className="flex flex-col items-center justify-center py-8">
           <div className="text-red-500 mb-4">Error: {error}</div>
           <button 
-            onClick={fetchCourseActivities}
+            onClick={fetchAllActivities}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
             Retry
@@ -127,9 +251,9 @@ export default function ActivityList() {
     return (
       <div className="w-full max-w-2xl mx-auto bg-white p-4">
         <div className="flex flex-col items-center justify-center py-8">
-          <div className="text-gray-500 mb-4">No course activities found</div>
+          <div className="text-gray-500 mb-4">No activities found</div>
           <button 
-            onClick={fetchCourseActivities}
+            onClick={fetchAllActivities}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
             Refresh
@@ -141,7 +265,7 @@ export default function ActivityList() {
 
   return (
     <Table className="w-full max-w-2xl mx-auto bg-white">
-      <TableCaption>A list of your recent course activities ({activities.length} total).</TableCaption>
+      <TableCaption>A list of your recent activities ({activities.length} total).</TableCaption>
       <TableHeader>
         <TableRow>
           <TableHead className="w-[100px]">Date</TableHead>
@@ -153,7 +277,7 @@ export default function ActivityList() {
         {activities.map((entry) => (
           <TableRow key={entry.id}>
             <TableCell className="font-medium">{entry.formattedDate}</TableCell>
-            <TableCell>Created a Course: {entry.courseCode}</TableCell>
+            <TableCell>{entry.description}</TableCell>
             <TableCell>{entry.formattedTime}</TableCell>
           </TableRow>
         ))}

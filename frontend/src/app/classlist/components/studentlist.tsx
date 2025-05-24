@@ -54,6 +54,7 @@ export default function StudentList({ searchTerm }: StudentListProps) {
 
         const response = await axios.get<ApiResponse>(
           `${process.env.NEXT_PUBLIC_API_URL}/students`,
+          
           {
             params: {
               include_deleted: showDeleted ? "true" : "false",
@@ -61,7 +62,6 @@ export default function StudentList({ searchTerm }: StudentListProps) {
             },
           }
         );
-
         console.log("Full API response:", response.data);
 
         const studentArray = response.data?.data?.data;
