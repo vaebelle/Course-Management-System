@@ -34,6 +34,8 @@ Route::prefix('courses')->group(function () {
 Route::prefix('students')->group(function () {
     Route::get('/', [StudentController::class, 'index']);           // GET /api/students
     Route::get('/{id}', [StudentController::class, 'show']);        // GET /api/students/{id}
+    Route::put('/{id}', [StudentController::class, 'update']);      // PUT /api/students/{id} - NOW ENABLED
+    Route::patch('/{id}', [StudentController::class, 'update']);    // PATCH /api/students/{id} - ALSO AVAILABLE
 });
 
 // Protected routes (authentication required)
@@ -41,8 +43,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     // Protected student management routes
     Route::prefix('students')->group(function () {
         Route::post('/', [StudentController::class, 'store']);          // POST /api/students
-        // Route::put('/{id}', [StudentController::class, 'update']);      // PUT /api/students/{id}
-        Route::patch('/{id}', [StudentController::class, 'update']);    // PATCH /api/students/{id}
         Route::delete('/{id}', [StudentController::class, 'destroy']);  // DELETE /api/students/{id}
     });
 });
