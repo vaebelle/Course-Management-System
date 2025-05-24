@@ -33,8 +33,6 @@ class CourseSeeder extends Seeder
             Course::create([
             'course_code' => 'CS052',
             'course_name' => 'El Factori.',
-            'semester' => '2nd',
-            'group' => 'D',
             'assigned_teacher' => $instructor->teacher_id
         ]);
     }
