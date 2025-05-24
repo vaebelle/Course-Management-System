@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Student extends Model
 {
-    // If your table name is not the plural of the model name, uncomment and set it:
-    // protected $table = 'students';
+    use HasFactory;
 
-    // Add the fields you want to be mass assignable
+    protected $primaryKey = 'student_id';
+    public $incrementing = false;
+    protected $keyType = 'integer';
+
     protected $fillable = [
         'student_id',
         'first_name',
@@ -18,12 +21,41 @@ class Student extends Model
         'enrolled_course',
         'created_at',
         'updated_at',
-        // Add other fields as needed
+        'deleted_at'
     ];
 
-    // If you want to hide certain fields from JSON responses, add them here
-    // protected $hidden = [
-    //     'created_at',
-    //     'updated_at',
-    // ];
+    protected $casts = [
+        'student_id' => 'integer',
+    ];
+
+    /**
+     * Get the course that the student is enrolled in
+     */
+    public function course()
+    {
+        return $this->belongsTo(Course::class, 'enrolled_course', 'course_code');
+    }
+
+    /**
+     * Get the instructor of the course the student is enrolled in
+     */
+    public function instructor()
+    {
+        return $this->hasOneThrough(
+            Instructor::class,      // Final model we want to access
+            Course::class,          // Intermediate model
+            'course_code',          // Foreign key on Course table (matches enrolled_course)
+            'teacher_id',           // Foreign key on Instructor table  
+            'enrolled_course',      // Local key on Student table
+            'assigned_teacher'      // Local key on Course table
+        );
+    }
+
+    /**
+     * Get full name attribute
+     */
+    public function getFullNameAttribute()
+    {
+        return $this->first_name . ' ' . $this->last_name;
+    }
 }

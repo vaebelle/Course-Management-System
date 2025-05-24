@@ -2,24 +2,38 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
+use App\Models\Course;
+use App\Models\Instructor;
 
 class CourseSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        //
-        DB::table('courses')->insert([
-            'course_code' => 'CPE 3207',
-            'course_name' => 'Research',
-            'assigned_teacher' => 22100129, // FK to instructor_id'
-            'created_at' => now(),
-            'updated_at' => now(),
+        $instructor = Instructor::factory()->create();
+
+        Course::create([
+            'course_code' => 'CS049',
+            'course_name' => 'Ut quia iure magnam.',
+            'semester' => '1st',
+            'group' => 'A',
+            'assigned_teacher' => $instructor->teacher_id
+        ]);
+
+        Course::create([
+            'course_code' => 'CS050',
+            'course_name' => 'Doloribus repellendus rerum.',
+            'semester' => '1st',
+            'group' => 'B',
+            'assigned_teacher' => $instructor->teacher_id
+        ]);
+
+        Course::create([
+            'course_code' => 'CS051',
+            'course_name' => 'Consectetur aut eveniet.',
+            'semester' => '2nd',
+            'group' => 'C',
+            'assigned_teacher' => $instructor->teacher_id
         ]);
     }
 }
