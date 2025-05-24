@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "../../../components/ui/dialog";
 import { Input } from "../../../components/ui/input";
+import { useRouter } from "next/navigation";
 
 interface CourseNavbarProps {
   instructorName?: string;
@@ -23,6 +24,7 @@ export default function CourseNavBar({
   instructorName = "Bea Belle Therese Caños",
 }: CourseNavbarProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const router = useRouter();
 
   const handleFileChange = (E: React.ChangeEvent<HTMLInputElement>) => {
     const file = E.target.files?.[0];
@@ -37,8 +39,12 @@ export default function CourseNavBar({
   };
 
   const handleLogout = () => {
-    //no logout logic yet for now huehue
-    alert("Logging out");
+    // Clear authentication data
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user");
+    
+    // Redirect to login page
+    router.push("/");
   };
 
   return (
