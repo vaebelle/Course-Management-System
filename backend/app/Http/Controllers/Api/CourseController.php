@@ -34,8 +34,8 @@ class CourseController extends Controller
                         'semester' => '2ND SEMESTER AY 2024-2025', 
                         'group' => 'Group 3', 
                         'color' => 'bg-blue-500',
-                        'created_at' => $course->created_at,
-                        'updated_at' => $course->updated_at,
+                        'created_at' => $course->created_at->setTimezone('Asia/Manila')->toISOString(),
+                        'updated_at' => $course->updated_at->setTimezone('Asia/Manila')->toISOString(),
                     ];
                 });
 
