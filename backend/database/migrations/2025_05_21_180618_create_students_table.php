@@ -15,7 +15,6 @@ return new class extends Migration
             $table->unsignedBigInteger('student_id')->primary(); 
             $table->string('first_name');
             $table->string('last_name');
-            $table->integer('year_standing');
             $table->string('program');
             $table->string('enrolled_course'); // FK to course_code
             $table->timestamps();

@@ -8,6 +8,13 @@ use App\Http\Controllers\Api\AuthController;
 Route::post('/instructor/signup', [AuthController::class, 'signup']);
 Route::post('/instructor/login', [AuthController::class, 'login']);
 
+Route::get('/courses', [CourseController::class, 'index']);
+Route::get('/courses/instructor/{teacherId}', [CourseController::class, 'getByInstructor']);
+
+// Public routes (no authentication required)
+Route::post('/instructor/signup', [AuthController::class, 'signup']);
+Route::post('/instructor/login', [AuthController::class, 'login']);
+
 // Protected routes (require authentication)
 Route::group([
     "middleware" => ["auth:sanctum"]

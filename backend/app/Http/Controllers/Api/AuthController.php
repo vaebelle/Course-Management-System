@@ -5,7 +5,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use App\Models\Instructors;
+use App\Models\Instructor;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -24,7 +24,7 @@ class AuthController extends Controller
             // Hash the password
             $data['password'] = Hash::make($data['password']);
             
-            $user = Instructors::create($data);
+            $user = Instructor::create($data);
             
             return response()->json([
                 "status" => true,
@@ -55,7 +55,7 @@ class AuthController extends Controller
             ]);
 
             // Find instructor by email
-            $instructor = Instructors::where('email', $data['email'])->first();
+            $instructor = Instructor::where('email', $data['email'])->first();
 
             if (!$instructor || !Hash::check($data['password'], $instructor->password)) {
                 return response()->json([
