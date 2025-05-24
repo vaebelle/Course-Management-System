@@ -4,9 +4,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\CourseController;
 use App\Http\Controllers\Api\AuthController;
 
-// Public routes (no authentication required)
-Route::post('/instructor/signup', [AuthController::class, 'signup']);
-Route::post('/instructor/login', [AuthController::class, 'login']);
+Route::get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth:sanctum');
 
 Route::get('/courses', [CourseController::class, 'index']);
 Route::get('/courses/instructor/{teacherId}', [CourseController::class, 'getByInstructor']);
