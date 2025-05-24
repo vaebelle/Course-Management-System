@@ -12,11 +12,22 @@ class StudentController extends Controller
 {
     /**
      * Display a listing of students.
+     * By default, only shows non-deleted students due to SoftDeletes trait
      */
     public function index(Request $request): JsonResponse
     {
         try {
             $query = Student::query();
+            
+            // Option to include trashed students
+            if ($request->has('include_deleted') && $request->get('include_deleted') == 'true') {
+                $query = Student::withTrashed();
+            }
+            
+            // Option to show only deleted students
+            if ($request->has('only_deleted') && $request->get('only_deleted') == 'true') {
+                $query = Student::onlyTrashed();
+            }
             
             // Add search functionality
             if ($request->has('search')) {
@@ -24,14 +35,10 @@ class StudentController extends Controller
                 $query->where(function($q) use ($search) {
                     $q->where('first_name', 'like', "%{$search}%")
                       ->orWhere('last_name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%")
-                      ->orWhere('student_id', 'like', "%{$search}%");
+                      ->orWhere('student_id', 'like', "%{$search}%")
+                      ->orWhere('program', 'like', "%{$search}%")
+                      ->orWhere('enrolled_course', 'like', "%{$search}%");
                 });
-            }
-            
-            // Add filtering by status
-            if ($request->has('status')) {
-                $query->where('status', $request->get('status'));
             }
             
             // Add pagination
@@ -60,20 +67,12 @@ class StudentController extends Controller
     {
         try {
             $validatedData = $request->validate([
+                'student_id' => 'required|integer|unique:students,student_id',
                 'first_name' => 'required|string|max:255',
                 'last_name' => 'required|string|max:255',
-                'email' => 'required|email|unique:students,email',
-                'student_id' => 'required|string|unique:students,student_id',
-                'phone' => 'nullable|string|max:20',
-                'date_of_birth' => 'nullable|date',
-                'address' => 'nullable|string|max:500',
-                'status' => 'in:active,inactive,graduated,suspended',
+                'program' => 'required|string|max:255',
+                'enrolled_course' => 'required|string|max:255|exists:courses,course_code',
             ]);
-            
-            // Set default status if not provided
-            if (!isset($validatedData['status'])) {
-                $validatedData['status'] = 'active';
-            }
             
             $student = Student::create($validatedData);
             
@@ -100,11 +99,19 @@ class StudentController extends Controller
 
     /**
      * Display the specified student.
+     * Will automatically exclude soft-deleted students unless specified otherwise
      */
-    public function show(string $id): JsonResponse
+    public function show(string $id, Request $request): JsonResponse
     {
         try {
-            $student = Student::findOrFail($id);
+            $query = Student::where('student_id', $id);
+            
+            // Option to include trashed students in search
+            if ($request->has('include_deleted') && $request->get('include_deleted') == 'true') {
+                $query = Student::withTrashed()->where('student_id', $id);
+            }
+            
+            $student = $query->firstOrFail();
             
             return response()->json([
                 'success' => true,
@@ -132,14 +139,14 @@ class StudentController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         try {
-            $student = Student::findOrFail($id);
+            $student = Student::where('student_id', $id)->firstOrFail();
             
             $validatedData = $request->validate([
-                'student_id' => 'sometimes|required|string|unique:students,student_id,' . $id,
+                'student_id' => 'sometimes|required|integer|unique:students,student_id,' . $student->id,
                 'first_name' => 'sometimes|required|string|max:255',
                 'last_name' => 'sometimes|required|string|max:255',
                 'program' => 'sometimes|required|string|max:255',
-                'enrolled_course' => 'sometimes|required|string|max:255',
+                'enrolled_course' => 'sometimes|required|string|max:255|exists:courses,course_code',
             ]);
             
             $student->update($validatedData);
@@ -171,17 +178,22 @@ class StudentController extends Controller
     }
 
     /**
-     * Remove the specified student from storage.
+     * Soft delete the specified student.
+     * This will set the deleted_at timestamp without removing the record from database
      */
     public function destroy(string $id): JsonResponse
     {
         try {
-            $student = Student::findOrFail($id);
-            $student->delete();
+            $student = Student::where('student_id', $id)->firstOrFail();
+            $student->delete(); // This performs soft delete due to SoftDeletes trait
             
             return response()->json([
                 'success' => true,
-                'message' => 'Student deleted successfully'
+                'message' => 'Student soft deleted successfully',
+                'data' => [
+                    'student_id' => $student->student_id,
+                    'deleted_at' => $student->deleted_at
+                ]
             ]);
             
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -193,6 +205,66 @@ class StudentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete student',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Restore a soft-deleted student.
+     */
+    public function restore(string $id): JsonResponse
+    {
+        try {
+            $student = Student::onlyTrashed()->where('student_id', $id)->firstOrFail();
+            $student->restore();
+            
+            return response()->json([
+                'success' => true,
+                'data' => $student->fresh(),
+                'message' => 'Student restored successfully'
+            ]);
+            
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Deleted student not found'
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to restore student',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Permanently delete a student from the database.
+     * This will completely remove the record from the database
+     */
+    public function forceDelete(string $id): JsonResponse
+    {
+        try {
+            $student = Student::withTrashed()->where('student_id', $id)->firstOrFail();
+            $studentData = $student->toArray(); // Store data before permanent deletion
+            $student->forceDelete();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Student permanently deleted from database',
+                'data' => $studentData
+            ]);
+            
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Student not found'
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to permanently delete student',
                 'error' => $e->getMessage()
             ], 500);
         }

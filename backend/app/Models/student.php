@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Student extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $primaryKey = 'student_id';
     public $incrementing = false;
@@ -19,13 +20,14 @@ class Student extends Model
         'last_name',
         'program',
         'enrolled_course',
-        'created_at',
-        'updated_at',
-        'deleted_at'
     ];
+
+    // Define the deleted_at column for soft deletes
+    protected $dates = ['deleted_at', 'created_at', 'updated_at'];
 
     protected $casts = [
         'student_id' => 'integer',
+        'deleted_at' => 'datetime',
     ];
 
     /**
@@ -57,5 +59,30 @@ class Student extends Model
     public function getFullNameAttribute()
     {
         return $this->first_name . ' ' . $this->last_name;
+    }
+
+    /**
+     * Scope to get only active (non-deleted) students
+     * Note: This is now handled automatically by SoftDeletes trait
+     */
+    public function scopeActive($query)
+    {
+        return $query->whereNull('deleted_at');
+    }
+
+    /**
+     * Scope to get only soft-deleted students
+     */
+    public function scopeOnlyTrashed($query)
+    {
+        return $query->onlyTrashed();
+    }
+
+    /**
+     * Scope to get all students including soft-deleted ones
+     */
+    public function scopeWithTrashed($query)
+    {
+        return $query->withTrashed();
     }
 }
