@@ -143,8 +143,22 @@ export default function ActivityList() {
           const studentName = `${student.first_name} ${student.last_name}`;
           const id_number = `${student.student_id}`;
           
-          // Student updated activity (only if updated_at is different from created_at)
-          if (student.updated_at !== student.created_at) {
+          // Check if created_at and updated_at are the same
+          if (student.created_at === student.updated_at) {
+            // Student enrolled activity (only when created_at equals updated_at)
+            const createdDateTime = formatDateTime(student.created_at);
+            allActivities.push({
+              id: `student-${student.student_id}-enrolled`,
+              type: 'student',
+              action: 'created',
+              timestamp: student.created_at,
+              formattedDate: createdDateTime.formattedDate,
+              formattedTime: createdDateTime.formattedTime,
+              description: `Student Enrolled: ${id_number} - ${studentName}`,
+              details: `ID: ${student.student_id}, Program: ${student.program}, Course: ${student.enrolled_course}`
+            });
+          } else {
+            // Student updated activity (only when created_at is different from updated_at)
             const updatedDateTime = formatDateTime(student.updated_at);
             allActivities.push({
               id: `student-${student.student_id}-updated`,

@@ -30,9 +30,10 @@ Route::prefix('courses')->group(function () {
     Route::get('/instructor/{teacherId}', [CourseController::class, 'getByInstructor']);
 });
 
-// Public Students routes (for frontend access)
+// Public Students routes (for frontend access) - NO AUTHENTICATION REQUIRED
 Route::prefix('students')->group(function () {
     Route::get('/', [StudentController::class, 'index']);           // GET /api/students
+    Route::post('/', [StudentController::class, 'store']);          // POST /api/students - MOVED HERE!
     Route::get('/{id}', [StudentController::class, 'show']);        // GET /api/students/{id}
     Route::put('/{id}', [StudentController::class, 'update']);      // PUT /api/students/{id}
     Route::patch('/{id}', [StudentController::class, 'update']);    // PATCH /api/students/{id}
@@ -42,9 +43,9 @@ Route::prefix('students')->group(function () {
 
 // Protected routes (authentication required)
 Route::group(['middleware' => ['auth:sanctum']], function () {
-    // Protected student management routes
+    // Protected student management routes (only sensitive operations)
     Route::prefix('students')->group(function () {
-        Route::post('/', [StudentController::class, 'store']);                    // POST /api/students
         Route::delete('/{id}/force', [StudentController::class, 'forceDelete']); // DELETE /api/students/{id}/force - PERMANENT DELETE
+        // Add other sensitive operations here if needed
     });
 });
