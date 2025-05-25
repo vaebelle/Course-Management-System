@@ -1,10 +1,8 @@
 "use client";
 
-import type React from "react";
-
+import React, { useState, useEffect } from "react";
 import { LogOut, Upload, User, AlertCircle, CheckCircle, X } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import { Button } from "../../../components/ui/button";
 import {
   Dialog,
@@ -50,16 +48,92 @@ interface ImportResult {
   }>;
 }
 
-export default function CourseNavBar({
-  instructorName = "Bea Belle Therese Caños",
-}: CourseNavbarProps) {
+interface UserData {
+  teacher_id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+}
+
+export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<ImportResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentInstructor, setCurrentInstructor] = useState<string>("Instructor");
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+
+  // Fetch current user data on component mount
+  useEffect(() => {
+    fetchCurrentUser();
+  }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const token = localStorage.getItem("auth_token");
+      
+      if (!token) {
+        // If no token, redirect to login
+        router.push("/");
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/user`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token is invalid, redirect to login
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("user");
+          router.push("/");
+          return;
+        }
+        throw new Error('Failed to fetch user data');
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.user) {
+        const userData: UserData = result.user;
+        setCurrentInstructor(`${userData.first_name} ${userData.last_name}`);
+        
+        // Also store in localStorage for offline access
+        localStorage.setItem("user", JSON.stringify(userData));
+      } else {
+        // Fallback to localStorage if API fails
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          const userData: UserData = JSON.parse(storedUser);
+          setCurrentInstructor(`${userData.first_name} ${userData.last_name}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      
+      // Fallback to localStorage
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          const userData: UserData = JSON.parse(storedUser);
+          setCurrentInstructor(`${userData.first_name} ${userData.last_name}`);
+        } catch (parseError) {
+          console.error('Error parsing stored user data:', parseError);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -101,8 +175,7 @@ export default function CourseNavBar({
             if (headerRowIndex > 0) {
               const scheduleRow = rows[headerRowIndex - 1];
               const scheduleInfo = scheduleRow.find(cell => 
-                cell && cell.toString().includes('CPE') || 
-                cell && cell.toString().includes('Group')
+                cell && (cell.toString().includes('CPE') || cell.toString().includes('Group'))
               );
               
               if (scheduleInfo) {
@@ -155,11 +228,13 @@ export default function CourseNavBar({
             }
 
             // Send data to backend with course information
+            const token = localStorage.getItem("auth_token");
             const response = await fetch(`${API_BASE_URL}/students/import-csv`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : '',
               },
               body: JSON.stringify({ 
                 students,
@@ -192,7 +267,7 @@ export default function CourseNavBar({
             setIsUploading(false);
           }
         },
-        error: (error: Error) => {
+        error: (error: any) => {
           console.error('CSV parsing error:', error);
           setUploadResult({
             success: false,
@@ -226,7 +301,11 @@ export default function CourseNavBar({
     setIsDialogOpen(false);
     setShowResult(false);
     setUploadResult(null);
+    setIsUploading(false);
   };
+
+  // Use prop if provided, otherwise use fetched instructor name
+  const displayName = instructorName || currentInstructor;
 
   return (
     <nav className="bg-[#017638] border-b shadow-sm">
@@ -234,8 +313,9 @@ export default function CourseNavBar({
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center">
             <span className="text-xl font-bold text-white">
-              Hi, <span className="text-white font-bold">{instructorName}</span>
-              !
+              Hi, <span className="text-white font-bold">
+                {loading ? "Loading..." : displayName}
+              </span>!
             </span>
           </div>
 
@@ -262,14 +342,6 @@ export default function CourseNavBar({
               <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader className="flex flex-row items-center justify-between">
                   <DialogTitle>Upload Class List</DialogTitle>
-                  {/* <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={closeDialog}
-                    className="h-6 w-6 p-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button> */}
                 </DialogHeader>
                 
                 <div className="grid gap-4 py-4">
@@ -282,12 +354,12 @@ export default function CourseNavBar({
                         <Input
                           id="file-upload"
                           type="file"
-                          accept=".csv,.xlsx,.xls"
+                          accept=".csv"
                           onChange={handleFileChange}
                           disabled={isUploading}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Accepted format: University of San Carlos Class List (CSV)
+                          Accepted formats: University of San Carlos Class List (CSV)
                         </p>
                       </div>
                       

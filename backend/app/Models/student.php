@@ -10,9 +10,10 @@ class Student extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $primaryKey = 'student_id';
-    public $incrementing = false;
-    protected $keyType = 'integer';
+    // Remove custom primary key settings since we're using default 'id' now
+    // protected $primaryKey = 'student_id';
+    // public $incrementing = false;
+    // protected $keyType = 'integer';
 
     protected $fillable = [
         'student_id',
@@ -84,5 +85,15 @@ class Student extends Model
     public function scopeWithTrashed($query)
     {
         return $query->withTrashed();
+    }
+
+    /**
+     * Scope to get students for a specific instructor
+     */
+    public function scopeForInstructor($query, $teacherId)
+    {
+        return $query->whereHas('course', function ($courseQuery) use ($teacherId) {
+            $courseQuery->where('assigned_teacher', $teacherId);
+        });
     }
 }

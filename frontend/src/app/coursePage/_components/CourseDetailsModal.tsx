@@ -83,19 +83,32 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
       console.log('Fetching course details for:', courseCode);
       console.log('API URL:', `${API_BASE_URL}/courses/${courseCode}/details`);
       
+      // Get auth token from localStorage
+      const token = localStorage.getItem("auth_token");
+      
+      if (!token) {
+        throw new Error('Please login to view course details');
+      }
+      
       // Fetch detailed course information
       const response = await fetch(`${API_BASE_URL}/courses/${courseCode}/details`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`, // Add auth token
         },
       });
 
       console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
 
       if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("user");
+          throw new Error('Session expired. Please login again.');
+        }
+        
         // Get more detailed error information
         const errorText = await response.text();
         console.error('Response error:', errorText);
@@ -275,6 +288,9 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                     <span className="text-[#017638] font-medium">Group:</span>
                     <p className="text-green-900">{courseDetails.group}</p>
                   </div>
+                </div>
+                <div className="mt-2 text-xs text-green-700">
+                  * Information extracted from uploaded USC class list CSV file
                 </div>
               </div>
 

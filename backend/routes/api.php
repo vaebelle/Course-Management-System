@@ -5,50 +5,35 @@ use App\Http\Controllers\Api\CourseController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\StudentController;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
-
-Route::get('/courses', [CourseController::class, 'index']);
-Route::get('/courses/instructor/{teacherId}', [CourseController::class, 'getByInstructor']);
-
 // Public routes (no authentication required)
 Route::post('/instructor/signup', [AuthController::class, 'signup']);
 Route::post('/instructor/login', [AuthController::class, 'login']);
 
 // Protected routes (require authentication)
-Route::group([
-    "middleware" => ["auth:sanctum"]
-], function(){
-    Route::post("logout", [AuthController::class, "logout"]);
-    Route::get('/user', [AuthController::class, 'user']);
-});
-
-// Course routes (you can add auth middleware if needed)
-Route::prefix('courses')->group(function () {
-    Route::get('/', [CourseController::class, 'index']);
-    Route::get('/instructor/{teacherId}', [CourseController::class, 'getByInstructor']);
-    Route::get('/{courseCode}/details', [StudentController::class, 'getCourseDetails']); // Course details route
-});
-
-// Public Students routes (for frontend access)
-Route::prefix('students')->group(function () {
-    Route::get('/', [StudentController::class, 'index']);           // GET /api/students
-    Route::get('/{id}', [StudentController::class, 'show']);        // GET /api/students/{id}
-    Route::put('/{id}', [StudentController::class, 'update']);      // PUT /api/students/{id}
-    Route::patch('/{id}', [StudentController::class, 'update']);    // PATCH /api/students/{id}
-    Route::delete('/{id}', [StudentController::class, 'destroy']);  // DELETE /api/students/{id} - SOFT DELETE
-    Route::post('/{id}/restore', [StudentController::class, 'restore']); // POST /api/students/{id}/restore
-    
-    // CSV Import route - Add authentication if needed
-    Route::post('/import-csv', [StudentController::class, 'importFromCsv']); // POST /api/students/import-csv
-});
-
-// Protected routes (authentication required)
 Route::group(['middleware' => ['auth:sanctum']], function () {
-    // Protected student management routes
+    // User routes
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/user', [AuthController::class, 'user']);
+    
+    // Course routes - all require authentication
+    Route::prefix('courses')->group(function () {
+        Route::get('/', [CourseController::class, 'index']);
+        Route::get('/instructor/{teacherId}', [CourseController::class, 'getByInstructor']);
+        Route::get('/{courseCode}/details', [StudentController::class, 'getCourseDetails']);
+    });
+
+    // Student routes - all require authentication
     Route::prefix('students')->group(function () {
-        Route::post('/', [StudentController::class, 'store']);                    // POST /api/students
-        Route::delete('/{id}/force', [StudentController::class, 'forceDelete']); // DELETE /api/students/{id}/force - PERMANENT DELETE
+        Route::get('/', [StudentController::class, 'index']);
+        Route::post('/', [StudentController::class, 'store']);
+        Route::get('/{id}', [StudentController::class, 'show']);
+        Route::put('/{id}', [StudentController::class, 'update']);
+        Route::patch('/{id}', [StudentController::class, 'update']);
+        Route::delete('/{id}', [StudentController::class, 'destroy']);
+        Route::post('/{id}/restore', [StudentController::class, 'restore']);
+        Route::delete('/{id}/force', [StudentController::class, 'forceDelete']);
+        
+        // CSV Import route
+        Route::post('/import-csv', [StudentController::class, 'importFromCsv']);
     });
 });

@@ -50,15 +50,33 @@ export function CourseCards() {
   const fetchCourses = async () => {
     try {
       setLoading(true);
+      
+      // Get auth token from localStorage
+      const token = localStorage.getItem("auth_token");
+      
+      if (!token) {
+        // If no token, redirect to login
+        setError("Please login to view courses");
+        return;
+      }
+
       const response = await fetch(`${API_BASE_URL}/courses`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`, // Add auth token
         },
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Token is invalid, clear it and show error
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("user");
+          setError("Session expired. Please login again.");
+          return;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -157,9 +175,9 @@ export function CourseCards() {
                 <CardTitle className="text-base leading-tight line-clamp-2">
                   {course.courseName}
                 </CardTitle>
-                <p className="text-sm text-muted-foreground font-mono">
+                {/* <p className="text-sm text-muted-foreground font-mono">
                   {course.courseCode}
-                </p>
+                </p> */}
               </CardHeader>
 
               <CardContent className="flex-1 flex flex-col justify-center">
@@ -179,13 +197,6 @@ export function CourseCards() {
                   </div>
                 </div>
               </CardContent>
-
-              <CardFooter className="pb-3 pt-2 flex-shrink-0">
-                <div className="w-full text-right">
-                  <p className="text-xs text-gray-500 truncate">{course.semester}</p>
-                  <p className="text-xs text-gray-500">{course.group}</p>
-                </div>
-              </CardFooter>
             </Card>
           </div>
         ))}
