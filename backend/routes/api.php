@@ -28,6 +28,7 @@ Route::group([
 Route::prefix('courses')->group(function () {
     Route::get('/', [CourseController::class, 'index']);
     Route::get('/instructor/{teacherId}', [CourseController::class, 'getByInstructor']);
+    Route::get('/{courseCode}/details', [StudentController::class, 'getCourseDetails']); // Course details route
 });
 
 // Public Students routes (for frontend access)
@@ -38,6 +39,9 @@ Route::prefix('students')->group(function () {
     Route::patch('/{id}', [StudentController::class, 'update']);    // PATCH /api/students/{id}
     Route::delete('/{id}', [StudentController::class, 'destroy']);  // DELETE /api/students/{id} - SOFT DELETE
     Route::post('/{id}/restore', [StudentController::class, 'restore']); // POST /api/students/{id}/restore
+    
+    // CSV Import route - Add authentication if needed
+    Route::post('/import-csv', [StudentController::class, 'importFromCsv']); // POST /api/students/import-csv
 });
 
 // Protected routes (authentication required)

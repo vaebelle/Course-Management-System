@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Student;
+use App\Models\Course;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class StudentController extends Controller
 {
@@ -92,6 +95,254 @@ class StudentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create student',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Import students from CSV data
+     */
+    public function importFromCsv(Request $request): JsonResponse
+    {
+        try {
+            // Validate the request
+            $request->validate([
+                'students' => 'required|array|min:1',
+                'students.*.student_id' => 'required|integer',
+                'students.*.first_name' => 'required|string|max:255',
+                'students.*.last_name' => 'required|string|max:255',
+                'students.*.program' => 'required|string|max:255',
+                'students.*.enrolled_course' => 'required|string|max:255',
+                'course_info' => 'sometimes|array', // Optional course info from CSV
+                'course_info.course_code' => 'sometimes|string|max:255',
+                'course_info.course_name' => 'sometimes|string|max:255',
+                'course_info.teacher_name' => 'sometimes|string|max:255',
+            ]);
+
+            $students = $request->input('students');
+            $courseInfo = $request->input('course_info', []);
+            $successCount = 0;
+            $errorCount = 0;
+            $errors = [];
+            $duplicates = [];
+            $courseCreated = false;
+
+            DB::beginTransaction();
+
+            // Check if we need to create the course
+            $courseCode = $students[0]['enrolled_course'] ?? null;
+            if ($courseCode) {
+                $courseExists = DB::table('courses')
+                    ->where('course_code', $courseCode)
+                    ->exists();
+
+                if (!$courseExists) {
+                    // Try to create the course with available information
+                    $courseName = $courseInfo['course_name'] ?? $courseCode;
+                    
+                    // For now, assign to a default teacher (you can modify this logic)
+                    $defaultTeacherId = DB::table('instructors')->first()->teacher_id ?? 1;
+                    
+                    DB::table('courses')->insert([
+                        'course_code' => $courseCode,
+                        'course_name' => $courseName,
+                        'assigned_teacher' => $defaultTeacherId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                    
+                    $courseCreated = true;
+                }
+            }
+
+            foreach ($students as $index => $studentData) {
+                try {
+                    // Course should exist now (either already existed or was created above)
+                    $courseExists = DB::table('courses')
+                        ->where('course_code', $studentData['enrolled_course'])
+                        ->exists();
+
+                    if (!$courseExists) {
+                        $errors[] = [
+                            'row' => $index + 1,
+                            'student_id' => $studentData['student_id'],
+                            'error' => "Course code '{$studentData['enrolled_course']}' could not be created or found"
+                        ];
+                        $errorCount++;
+                        continue;
+                    }
+
+                    // Check for existing student
+                    $existingStudent = Student::withTrashed()
+                        ->where('student_id', $studentData['student_id'])
+                        ->first();
+
+                    if ($existingStudent) {
+                        if ($existingStudent->trashed()) {
+                            // Restore and update the soft-deleted student
+                            $existingStudent->restore();
+                            $existingStudent->update([
+                                'first_name' => $studentData['first_name'],
+                                'last_name' => $studentData['last_name'],
+                                'program' => $studentData['program'],
+                                'enrolled_course' => $studentData['enrolled_course'],
+                            ]);
+                            $successCount++;
+                        } else {
+                            // Student already exists and is active
+                            $duplicates[] = [
+                                'row' => $index + 1,
+                                'student_id' => $studentData['student_id'],
+                                'name' => $studentData['first_name'] . ' ' . $studentData['last_name']
+                            ];
+                            $errorCount++;
+                        }
+                        continue;
+                    }
+
+                    // Create new student
+                    Student::create([
+                        'student_id' => $studentData['student_id'],
+                        'first_name' => $studentData['first_name'],
+                        'last_name' => $studentData['last_name'],
+                        'program' => $studentData['program'],
+                        'enrolled_course' => $studentData['enrolled_course'],
+                    ]);
+
+                    $successCount++;
+
+                } catch (\Exception $e) {
+                    $errors[] = [
+                        'row' => $index + 1,
+                        'student_id' => $studentData['student_id'] ?? 'Unknown',
+                        'error' => $e->getMessage()
+                    ];
+                    $errorCount++;
+                }
+            }
+
+            DB::commit();
+
+            $message = "Import completed. {$successCount} students imported successfully.";
+            if ($courseCreated) {
+                $message .= " Course '{$courseCode}' was created automatically.";
+            }
+
+            $response = [
+                'success' => true,
+                'message' => $message,
+                'summary' => [
+                    'total_processed' => count($students),
+                    'successful' => $successCount,
+                    'errors' => $errorCount,
+                    'duplicates' => count($duplicates),
+                    'course_created' => $courseCreated
+                ]
+            ];
+
+            if (!empty($errors)) {
+                $response['errors'] = $errors;
+            }
+
+            if (!empty($duplicates)) {
+                $response['duplicates'] = $duplicates;
+            }
+
+            return response()->json($response, 200);
+
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to import students',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get detailed course information with students
+     */
+    public function getCourseDetails($courseCode): JsonResponse
+    {
+        try {
+            $course = Course::with(['instructor', 'students'])
+                ->where('course_code', $courseCode)
+                ->first();
+
+            if (!$course) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Course not found'
+                ], 404);
+            }
+
+            // Get students for this course (including soft-deleted ones)
+            $activeStudents = Student::withTrashed()
+                ->where('enrolled_course', $courseCode)
+                ->select([
+                    'student_id', // Use student_id as primary identifier
+                    'first_name',
+                    'last_name',
+                    'program',
+                    'enrolled_course',
+                    'created_at',
+                    'updated_at',
+                    'deleted_at'
+                ])
+                ->get();
+
+            $courseDetails = [
+                'course_code' => $course->course_code,
+                'course_name' => $course->course_name,
+                'instructor_name' => $course->instructor 
+                    ? $course->instructor->first_name . ' ' . $course->instructor->last_name
+                    : 'No Instructor Assigned',
+                'instructor_email' => $course->instructor ? $course->instructor->email : null,
+                'semester' => '2ND SEMESTER AY 2024-2025', // This could be dynamic
+                'group' => 'Group 3', // This could be dynamic
+                'schedule' => 'FSat - 10:30 AM - 01:30 PM', // This could come from additional data
+                'location' => 'CNLab', // This could come from additional data
+                'enrolled_count' => $activeStudents->whereNull('deleted_at')->count(),
+                'total_students' => $activeStudents->count(),
+                'created_at' => $course->created_at->setTimezone('Asia/Manila')->toISOString(),
+                'updated_at' => $course->updated_at->setTimezone('Asia/Manila')->toISOString(),
+                'students' => $activeStudents->map(function ($student) {
+                    return [
+                        'id' => $student->student_id, // Use student_id as id for frontend
+                        'student_id' => $student->student_id,
+                        'first_name' => $student->first_name,
+                        'last_name' => $student->last_name,
+                        'full_name' => $student->first_name . ' ' . $student->last_name,
+                        'program' => $student->program,
+                        'enrolled_course' => $student->enrolled_course,
+                        'status' => $student->deleted_at ? 'inactive' : 'active',
+                        'enrolled_date' => $student->created_at->setTimezone('Asia/Manila')->toDateString(),
+                        'created_at' => $student->created_at->setTimezone('Asia/Manila')->toISOString(),
+                        'updated_at' => $student->updated_at->setTimezone('Asia/Manila')->toISOString(),
+                        'deleted_at' => $student->deleted_at ? $student->deleted_at->setTimezone('Asia/Manila')->toISOString() : null,
+                    ];
+                })
+            ];
+
+            return response()->json([
+                'success' => true,
+                'data' => $courseDetails,
+                'message' => 'Course details retrieved successfully'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve course details',
                 'error' => $e->getMessage()
             ], 500);
         }

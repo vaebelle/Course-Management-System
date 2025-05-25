@@ -1,6 +1,6 @@
 'use client';
 
-import { FileText, MessageSquare } from "lucide-react";
+import { FileText, MessageSquare, Users, Clock } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
@@ -13,6 +13,9 @@ import {
 } from "../../../components/ui/card";
 
 import { Separator } from "../../../components/ui/separator";
+
+// Import the CourseDetailsModal component
+import CourseDetailsModal from './CourseDetailsModal';
 
 interface Course {
   id: string;
@@ -34,6 +37,8 @@ export function CourseCards() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Replace with your Laravel backend URL
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -72,6 +77,16 @@ export function CourseCards() {
     }
   };
 
+  const handleCourseClick = (courseCode: string) => {
+    setSelectedCourse(courseCode);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedCourse(null);
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -88,7 +103,7 @@ export function CourseCards() {
         <div className="text-red-500 mb-4">Error: {error}</div>
         <button 
           onClick={fetchCourses}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className="px-4 py-2 bg-[#017638] text-white rounded hover:bg-green-700 transition-colors"
         >
           Retry
         </button>
@@ -103,7 +118,7 @@ export function CourseCards() {
         <div className="text-gray-500 mb-4">No courses found</div>
         <button 
           onClick={fetchCourses}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className="px-4 py-2 bg-[#017638] text-white rounded hover:bg-green-700 transition-colors"
         >
           Refresh
         </button>
@@ -124,46 +139,64 @@ export function CourseCards() {
           >
             Refresh
           </button>
-          <Link
-            href="/courses"
-            className="text-sm font-medium text-blue-600 hover:underline"
-          >
-            All Courses
-          </Link>
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(250px,1fr))]">
+      {/* Fixed size grid with consistent tile dimensions */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {courses.map((course) => (
           <div
             key={course.courseCode}
-            className="rounded-md shadow-md overflow-hidden flex flex-col"
+            className="w-full h-48 rounded-md shadow-md overflow-hidden flex flex-col cursor-pointer transform transition-all duration-200 hover:scale-105 hover:shadow-lg"
+            onClick={() => handleCourseClick(course.courseCode)}
           >
-            <div className="h-2 w-full" style={{ backgroundColor: "#f5c034" }} />
+            <div className="h-2 w-full flex-shrink-0" style={{ backgroundColor: "#f5c034" }} />
             
-            <Card className="rounded-t-none flex flex-col justify-between flex-1">
-              <CardHeader className="pb-2 min-h-24 flex flex-col justify-between">
-                <CardTitle className="text-base">{course.courseName}</CardTitle>
-                <p className="text-sm text-muted-foreground">{course.courseCode}</p>
+            <Card className="rounded-t-none flex flex-col justify-between flex-1 h-full hover:bg-gray-50 transition-colors duration-200">
+              <CardHeader className="pb-2 flex-shrink-0">
+                <CardTitle className="text-base leading-tight line-clamp-2">
+                  {course.courseName}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground font-mono">
+                  {course.courseCode}
+                </p>
               </CardHeader>
 
-              <CardContent>
-                <Separator orientation="horizontal" />
-                <div className="mt-2">
-                  <p className="text-xs text-gray-600">
-                    Instructor: {course.instructorName}
-                  </p>
+              <CardContent className="flex-1 flex flex-col justify-center">
+                <Separator orientation="horizontal" className="mb-3" />
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                    <p className="text-xs text-gray-600 truncate">
+                      {course.instructorName}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-3 w-3 text-gray-500 flex-shrink-0" />
+                    <p className="text-xs text-gray-600">
+                      Click to view details
+                    </p>
+                  </div>
                 </div>
               </CardContent>
 
-              <CardFooter className="pb-2 flex flex-col items-end text-right">
-                <p className="text-sm">{course.semester}</p>
-                <p className="text-sm">{course.group}</p>
+              <CardFooter className="pb-3 pt-2 flex-shrink-0">
+                <div className="w-full text-right">
+                  <p className="text-xs text-gray-500 truncate">{course.semester}</p>
+                  <p className="text-xs text-gray-500">{course.group}</p>
+                </div>
               </CardFooter>
             </Card>
           </div>
         ))}
       </div>
+
+      {/* Course Details Modal */}
+      <CourseDetailsModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        courseCode={selectedCourse || ''}
+      />
     </>
   );
 }
