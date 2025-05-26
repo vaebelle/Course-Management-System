@@ -120,45 +120,67 @@ class StudentController extends Controller
 
             foreach ($students as $index => $studentData) {
                 try {
-                    // Check if student already exists in THIS SPECIFIC COURSE (ANYWHERE)
-                    // This includes both active and soft-deleted students
-                    $existingStudentInAnyCourse = Student::withTrashed()
+                    // Check if student already exists in THIS SPECIFIC COURSE with THIS INSTRUCTOR
+                    $existingStudentSameInstructor = Student::withTrashed()
                         ->where('student_id', $studentData['student_id'])
                         ->where('enrolled_course', $studentData['enrolled_course'])
+                        ->where('enrolled_by_instructor', $instructor->teacher_id)
                         ->first();
 
-                    if ($existingStudentInAnyCourse) {
-                        // Student exists in this course - ALWAYS BLOCK regardless of instructor
-                        $currentInstructor = null;
-                        if ($existingStudentInAnyCourse->enrolledByInstructor) {
-                            $currentInstructor = $existingStudentInAnyCourse->enrolledByInstructor->first_name . ' ' . 
-                                               $existingStudentInAnyCourse->enrolledByInstructor->last_name;
-                        }
-
-                        if ($existingStudentInAnyCourse->trashed()) {
-                            // Even if soft-deleted, still block - don't allow any instructor to "steal" students
-                            $tempDuplicates[] = [
-                                'row' => $index + 1,
-                                'student_id' => $studentData['student_id'],
-                                'name' => $studentData['first_name'] . ' ' . $studentData['last_name'],
-                                'current_course' => $existingStudentInAnyCourse->enrolled_course,
-                                'note' => 'Student was previously enrolled in this course with ' . ($currentInstructor ?? 'another instructor') . '. Cannot re-enroll with different instructor.'
+                    if ($existingStudentSameInstructor) {
+                        // Student already exists with current instructor - this is a true duplicate
+                        if ($existingStudentSameInstructor->trashed()) {
+                            // Student was soft-deleted by this instructor - we can restore them
+                            $validStudents[] = [
+                                'index' => $index, 
+                                'data' => $studentData, 
+                                'restore' => $existingStudentSameInstructor
                             ];
                         } else {
-                            // Student is currently active in this course - BLOCK THIS
+                            // Student is currently active with this instructor - duplicate
                             $tempDuplicates[] = [
                                 'row' => $index + 1,
                                 'student_id' => $studentData['student_id'],
                                 'name' => $studentData['first_name'] . ' ' . $studentData['last_name'],
-                                'current_course' => $existingStudentInAnyCourse->enrolled_course,
-                                'current_instructor' => $currentInstructor,
-                                'note' => 'Student is currently enrolled in this course with ' . ($currentInstructor ?? 'another instructor') . '. Cannot enroll with multiple instructors.'
+                                'current_course' => $existingStudentSameInstructor->enrolled_course,
+                                'note' => 'Student is already enrolled in this course with you.'
                             ];
                         }
-                    } else {
-                        // Student is not in this course yet - mark as valid for import
-                        $validStudents[] = ['index' => $index, 'data' => $studentData];
+                        continue;
                     }
+
+                    // Check if student exists with a DIFFERENT instructor
+                    $existingStudentDifferentInstructor = Student::withTrashed()
+                        ->where('student_id', $studentData['student_id'])
+                        ->where('enrolled_course', $studentData['enrolled_course'])
+                        ->where('enrolled_by_instructor', '!=', $instructor->teacher_id)
+                        ->first();
+
+                    if ($existingStudentDifferentInstructor) {
+                        // Student exists with different instructor - BLOCK this (business rule)
+                        $currentInstructor = null;
+                        if ($existingStudentDifferentInstructor->enrolledByInstructor) {
+                            $currentInstructor = $existingStudentDifferentInstructor->enrolledByInstructor->first_name . ' ' . 
+                                               $existingStudentDifferentInstructor->enrolledByInstructor->last_name;
+                        }
+
+                        $tempDuplicates[] = [
+                            'row' => $index + 1,
+                            'student_id' => $studentData['student_id'],
+                            'name' => $studentData['first_name'] . ' ' . $studentData['last_name'],
+                            'current_course' => $existingStudentDifferentInstructor->enrolled_course,
+                            'current_instructor' => $currentInstructor,
+                            'note' => 'Student is enrolled in this course with ' . ($currentInstructor ?? 'another instructor') . '. Cannot enroll with multiple instructors.'
+                        ];
+                        continue;
+                    }
+
+                    // Student is not in this course at all - can be imported
+                    $validStudents[] = [
+                        'index' => $index, 
+                        'data' => $studentData, 
+                        'restore' => null
+                    ];
 
                 } catch (\Exception $e) {
                     $tempErrors[] = [
@@ -177,8 +199,30 @@ class StudentController extends Controller
                 if (!empty($tempDuplicates)) {
                     $message .= ".";
                 } else if (!empty($tempErrors)) {
-                    $message .= " All students had errors during validation.";
+                    $message .= ". All students had errors during validation.";
                 }
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $message,
+                    'summary' => [
+                        'total_processed' => count($students),
+                        'successful' => 0,
+                        'errors' => count($tempErrors),
+                        'duplicates' => count($tempDuplicates),
+                        'course_created' => false
+                    ],
+                    'errors' => $tempErrors,
+                    'duplicates' => $tempDuplicates
+                ], 422);
+            }
+
+            // Check if we have too few valid students (less than 50% of total)
+            $validPercentage = (count($validStudents) / count($students)) * 100;
+            if ($validPercentage < 50) {
+                DB::rollBack();
+                
+                $message = "Import failed. Too many duplicate students ({$validPercentage}% valid). Course not created to prevent incomplete class lists.";
 
                 return response()->json([
                     'success' => false,
@@ -220,6 +264,7 @@ class StudentController extends Controller
             foreach ($validStudents as $validStudent) {
                 $index = $validStudent['index'];
                 $studentData = $validStudent['data'];
+                $existingStudent = $validStudent['restore'] ?? null;
 
                 try {
                     // Verify course is assigned to current instructor (should always pass now)
@@ -237,16 +282,29 @@ class StudentController extends Controller
                         continue;
                     }
 
-                    // Create new student enrollment (no restore logic - students belong to one instructor only)
-                    Student::create([
-                        'student_id' => $studentData['student_id'],
-                        'first_name' => $studentData['first_name'],
-                        'last_name' => $studentData['last_name'],
-                        'program' => $studentData['program'],
-                        'enrolled_course' => $studentData['enrolled_course'],
-                        'enrolled_by_instructor' => $instructor->teacher_id,
-                    ]);
-                    $successCount++;
+                    if ($existingStudent) {
+                        // Restore and update the soft-deleted student (same instructor)
+                        $existingStudent->restore();
+                        $existingStudent->update([
+                            'first_name' => $studentData['first_name'],
+                            'last_name' => $studentData['last_name'],
+                            'program' => $studentData['program'],
+                            'enrolled_course' => $studentData['enrolled_course'],
+                            'enrolled_by_instructor' => $instructor->teacher_id,
+                        ]);
+                        $successCount++;
+                    } else {
+                        // Create new student enrollment
+                        Student::create([
+                            'student_id' => $studentData['student_id'],
+                            'first_name' => $studentData['first_name'],
+                            'last_name' => $studentData['last_name'],
+                            'program' => $studentData['program'],
+                            'enrolled_course' => $studentData['enrolled_course'],
+                            'enrolled_by_instructor' => $instructor->teacher_id,
+                        ]);
+                        $successCount++;
+                    }
 
                 } catch (\Exception $e) {
                     $errors[] = [
@@ -313,6 +371,222 @@ class StudentController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Bulk import students from multiple CSV datasets
+     */
+    public function bulkImportFromCsv(Request $request): JsonResponse
+    {
+        try {
+            $instructor = Auth::user();
+            
+            if (!$instructor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - Please login first'
+                ], 401);
+            }
+
+            // Validate the request
+            $request->validate([
+                'imports' => 'required|array|min:1',
+                'imports.*.course_code' => 'required|string|max:255',
+                'imports.*.students' => 'required|array|min:1',
+                'imports.*.students.*.student_id' => 'required|integer',
+                'imports.*.students.*.first_name' => 'required|string|max:255',
+                'imports.*.students.*.last_name' => 'required|string|max:255',
+                'imports.*.students.*.program' => 'required|string|max:255',
+                'imports.*.students.*.enrolled_course' => 'required|string|max:255',
+                'imports.*.course_info' => 'sometimes|array',
+            ]);
+
+            $imports = $request->input('imports');
+            $results = [];
+            $successfulImports = 0;
+            $failedImports = 0;
+
+            DB::beginTransaction();
+
+            foreach ($imports as $importIndex => $importData) {
+                try {
+                    $courseCode = $importData['course_code'];
+                    $students = $importData['students'];
+                    $courseInfo = $importData['course_info'] ?? [];
+
+                    // Process each import individually
+                    $importResult = $this->processSingleImport($instructor, $students, $courseInfo, $courseCode);
+                    
+                    $results[] = [
+                        'course_code' => $courseCode,
+                        'success' => $importResult['success'],
+                        'message' => $importResult['message'],
+                        'summary' => $importResult['summary'],
+                        'errors' => $importResult['errors'] ?? [],
+                        'duplicates' => $importResult['duplicates'] ?? []
+                    ];
+
+                    if ($importResult['success']) {
+                        $successfulImports++;
+                    } else {
+                        $failedImports++;
+                    }
+
+                } catch (\Exception $e) {
+                    $results[] = [
+                        'course_code' => $importData['course_code'] ?? "Import " . ($importIndex + 1),
+                        'success' => false,
+                        'message' => 'Failed to process import: ' . $e->getMessage(),
+                        'summary' => [
+                            'total_processed' => 0,
+                            'successful' => 0,
+                            'errors' => 1,
+                            'duplicates' => 0,
+                            'course_created' => false
+                        ],
+                        'errors' => [['error' => $e->getMessage()]],
+                        'duplicates' => []
+                    ];
+                    $failedImports++;
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => $successfulImports > 0,
+                'message' => "Bulk import completed. {$successfulImports} courses imported successfully, {$failedImports} failed.",
+                'summary' => [
+                    'total_imports' => count($imports),
+                    'successful_imports' => $successfulImports,
+                    'failed_imports' => $failedImports
+                ],
+                'results' => $results
+            ], 200);
+
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Bulk import failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper method to process a single import
+     */
+    private function processSingleImport($instructor, $students, $courseInfo, $courseCode)
+    {
+        $successCount = 0;
+        $errorCount = 0;
+        $errors = [];
+        $duplicates = [];
+        $courseCreated = false;
+
+        // Pre-validate students
+        $validStudents = [];
+        foreach ($students as $index => $studentData) {
+            $existingStudent = Student::withTrashed()
+                ->where('student_id', $studentData['student_id'])
+                ->where('enrolled_course', $studentData['enrolled_course'])
+                ->first();
+
+            if ($existingStudent) {
+                $currentInstructor = null;
+                if ($existingStudent->enrolledByInstructor) {
+                    $currentInstructor = $existingStudent->enrolledByInstructor->first_name . ' ' . 
+                                       $existingStudent->enrolledByInstructor->last_name;
+                }
+
+                $duplicates[] = [
+                    'row' => $index + 1,
+                    'student_id' => $studentData['student_id'],
+                    'name' => $studentData['first_name'] . ' ' . $studentData['last_name'],
+                    'current_course' => $existingStudent->enrolled_course,
+                    'note' => 'Student already enrolled in this course with ' . ($currentInstructor ?? 'another instructor')
+                ];
+            } else {
+                $validStudents[] = $studentData;
+            }
+        }
+
+        // If no valid students, don't create course
+        if (empty($validStudents)) {
+            return [
+                'success' => false,
+                'message' => "No students imported for {$courseCode}. All students already exist.",
+                'summary' => [
+                    'total_processed' => count($students),
+                    'successful' => 0,
+                    'errors' => 0,
+                    'duplicates' => count($duplicates),
+                    'course_created' => false
+                ],
+                'errors' => $errors,
+                'duplicates' => $duplicates
+            ];
+        }
+
+        // Create/verify course
+        $instructorCourse = Course::where('course_code', $courseCode)
+            ->where('assigned_teacher', $instructor->teacher_id)
+            ->first();
+        
+        if (!$instructorCourse) {
+            $courseName = $courseInfo['course_name'] ?? $courseCode;
+            Course::create([
+                'course_code' => $courseCode,
+                'course_name' => $courseName,
+                'assigned_teacher' => $instructor->teacher_id,
+            ]);
+            $courseCreated = true;
+        }
+
+        // Import valid students
+        foreach ($validStudents as $studentData) {
+            try {
+                Student::create([
+                    'student_id' => $studentData['student_id'],
+                    'first_name' => $studentData['first_name'],
+                    'last_name' => $studentData['last_name'],
+                    'program' => $studentData['program'],
+                    'enrolled_course' => $studentData['enrolled_course'],
+                    'enrolled_by_instructor' => $instructor->teacher_id,
+                ]);
+                $successCount++;
+            } catch (\Exception $e) {
+                $errors[] = [
+                    'student_id' => $studentData['student_id'],
+                    'error' => $e->getMessage()
+                ];
+                $errorCount++;
+            }
+        }
+
+        return [
+            'success' => $successCount > 0,
+            'message' => $successCount > 0 
+                ? "{$successCount} students imported successfully for {$courseCode}." 
+                : "Failed to import students for {$courseCode}.",
+            'summary' => [
+                'total_processed' => count($students),
+                'successful' => $successCount,
+                'errors' => $errorCount,
+                'duplicates' => count($duplicates),
+                'course_created' => $courseCreated
+            ],
+            'errors' => $errors,
+            'duplicates' => $duplicates
+        ];
     }
 
     /**
@@ -409,5 +683,4 @@ class StudentController extends Controller
         }
     }
 
- 
 }

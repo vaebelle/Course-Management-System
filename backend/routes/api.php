@@ -38,7 +38,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('/{id}/restore', [StudentController::class, 'restore']);
         Route::delete('/{id}/force', [StudentController::class, 'forceDelete']);
         
-        // CSV Import route
+        // CSV Import routes
         Route::post('/import-csv', [StudentController::class, 'importFromCsv']);
+        Route::post('/bulk-import-csv', [StudentController::class, 'bulkImportFromCsv']); 
     });
 });
