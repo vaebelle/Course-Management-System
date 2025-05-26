@@ -16,7 +16,7 @@ class Student extends Model
         'last_name',
         'program',
         'enrolled_course',
-        'enrolled_by_instructor', // Add this new field
+        'enrolled_by_instructor', 
     ];
 
     // Define the deleted_at column for soft deletes
@@ -50,12 +50,12 @@ class Student extends Model
     public function instructor()
     {
         return $this->hasOneThrough(
-            Instructor::class,      // Final model we want to access
-            Course::class,          // Intermediate model
-            'course_code',          // Foreign key on Course table (matches enrolled_course)
-            'teacher_id',           // Foreign key on Instructor table  
-            'enrolled_course',      // Local key on Student table
-            'assigned_teacher'      // Local key on Course table
+            Instructor::class,      
+            Course::class,          
+            'course_code',          
+            'teacher_id',           
+            'enrolled_course',      
+            'assigned_teacher'     
         );
     }
 

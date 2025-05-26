@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
+use App\Models\Student;  
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,6 +35,8 @@ class CourseController extends Controller
                     'course_code',
                     'course_name',
                     'assigned_teacher',
+                    'schedule',
+                    'location',
                     'created_at',
                     'updated_at'
                 ])
@@ -49,6 +52,8 @@ class CourseController extends Controller
                         'semester' => '2ND SEMESTER AY 2024-2025', 
                         'group' => 'Group 3', 
                         'color' => 'bg-blue-500',
+                        'schedule' => $course->schedule ?? 'TBD',
+                        'location' => $course->location ?? 'TBD',
                         'created_at' => $course->created_at->setTimezone('Asia/Manila')->toISOString(),
                         'updated_at' => $course->updated_at->setTimezone('Asia/Manila')->toISOString(),
                     ];
@@ -106,6 +111,8 @@ class CourseController extends Controller
                         'semester' => '2ND SEMESTER AY 2024-2025',
                         'group' => 'Group 3',
                         'color' => 'bg-blue-500',
+                        'schedule' => $course->schedule ?? 'TBD',
+                        'location' => $course->location ?? 'TBD',
                         'created_at' => $course->created_at,
                         'updated_at' => $course->updated_at,
                     ];
@@ -226,10 +233,21 @@ class CourseController extends Controller
             }
 
             // Get students enrolled in this course by this instructor
-            $students = DB::table('students')
+            $students = Student::withTrashed()
                 ->where('enrolled_course', $courseCode)
                 ->where('enrolled_by_instructor', $instructor->teacher_id)
-                ->select('student_id', 'first_name', 'last_name', 'program', 'enrolled_course', 'created_at', 'updated_at', 'deleted_at')
+                ->select([
+                    'id',
+                    'student_id', 
+                    'first_name',
+                    'last_name',
+                    'program',
+                    'enrolled_course',
+                    'enrolled_by_instructor',
+                    'created_at',
+                    'updated_at',
+                    'deleted_at'
+                ])
                 ->get();
 
             $courseDetails = [
@@ -238,18 +256,38 @@ class CourseController extends Controller
                 'instructor_name' => $course->instructor 
                     ? $course->instructor->first_name . ' ' . $course->instructor->last_name 
                     : 'No Instructor Assigned',
+                'instructor_email' => $course->instructor ? $course->instructor->email : null,
                 'semester' => '2ND SEMESTER AY 2024-2025',
                 'group' => 'Group 3',
-                'schedule' => 'TBD',
-                'location' => 'TBD',
-                'enrolled_count' => $students->count(),
-                'students' => $students
+                'schedule' => $course->schedule ?? 'TBD',
+                'location' => $course->location ?? 'TBD',
+                'enrolled_count' => $students->whereNull('deleted_at')->count(),
+                'total_students' => $students->count(),
+                'created_at' => $course->created_at->setTimezone('Asia/Manila')->toISOString(),
+                'updated_at' => $course->updated_at->setTimezone('Asia/Manila')->toISOString(),
+                'students' => $students->map(function ($student) {
+                    return [
+                        'id' => $student->student_id,
+                        'student_id' => $student->student_id,
+                        'first_name' => $student->first_name,
+                        'last_name' => $student->last_name,
+                        'full_name' => $student->first_name . ' ' . $student->last_name,
+                        'program' => $student->program,
+                        'enrolled_course' => $student->enrolled_course,
+                        'status' => $student->deleted_at ? 'inactive' : 'active',
+                        'enrolled_date' => $student->created_at->setTimezone('Asia/Manila')->toDateString(),
+                        'created_at' => $student->created_at->setTimezone('Asia/Manila')->toISOString(),
+                        'updated_at' => $student->updated_at->setTimezone('Asia/Manila')->toISOString(),
+                        'deleted_at' => $student->deleted_at ? $student->deleted_at->setTimezone('Asia/Manila')->toISOString() : null,
+                    ];
+                })
             ];
 
             return response()->json([
                 'success' => true,
-                'data' => $courseDetails
-            ]);
+                'data' => $courseDetails,
+                'message' => 'Course details retrieved successfully'
+            ], 200);
 
         } catch (\Exception $e) {
             return response()->json([

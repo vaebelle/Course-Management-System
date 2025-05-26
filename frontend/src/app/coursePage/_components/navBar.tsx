@@ -19,7 +19,7 @@ import Papa from "papaparse";
 
 interface CourseNavbarProps {
   instructorName?: string;
-  onCourseUpdate?: () => void; // Add this callback prop
+  onCourseUpdate?: () => void;
 }
 
 interface StudentData {
@@ -33,7 +33,7 @@ interface StudentData {
 interface ImportResult {
   success: boolean;
   message: string;
-  course_code?: string; // Add course code for tracking
+  course_code?: string;
   summary?: {
     total_processed: number;
     successful: number;
@@ -68,7 +68,7 @@ interface UserData {
 
 export default function CourseNavBar({
   instructorName,
-  onCourseUpdate, // Add this prop
+  onCourseUpdate, 
 }: CourseNavbarProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<ImportResult | BulkImportResult | null>(null);
@@ -279,13 +279,20 @@ export default function CourseNavBar({
                   throw new Error(`Invalid USC class list format in ${file.name}. Could not find header row with "ID Number".`);
                 }
 
-                // Extract course code
+                // Extract course code, schedule, and location
                 let courseCode = 'UNKNOWN';
-                if (headerRowIndex > 0) {
-                  const scheduleRow = rows[headerRowIndex - 1];
-                  const scheduleInfo = scheduleRow.find(cell => 
-                    cell && cell.toString().includes('CPE') || 
-                    cell && cell.toString().includes('Group')
+                let schedule = 'TBD';
+                let location = 'TBD';
+                
+                // Look for information in the rows before header
+                for (let i = 0; i < headerRowIndex; i++) {
+                  const row = rows[i];
+                  
+                  // Extract course code
+                  const scheduleInfo = row.find(cell => 
+                    cell && (cell.toString().includes('CPE') || 
+                             cell.toString().includes('Group') ||
+                             cell.toString().match(/[A-Z]{2,4}\s*\d+/))
                   );
                   
                   if (scheduleInfo) {
@@ -295,6 +302,53 @@ export default function CourseNavBar({
                       courseCode = courseMatch[1].replace(/\s+/g, '');
                     }
                   }
+
+                  // Extract schedule (look for time patterns and day patterns)
+                  row.forEach(cell => {
+                    if (!cell) return;
+                    const cellStr = cell.toString().trim();
+                    
+                    // Look for time patterns like "10:30 AM - 01:30 PM" or "FSat"
+                    if (cellStr.match(/\d{1,2}:\d{2}\s*(AM|PM)\s*-\s*\d{1,2}:\d{2}\s*(AM|PM)/i)) {
+                      schedule = cellStr;
+                    } else if (cellStr.match(/(MON|TUE|WED|THU|FRI|SAT|SUN)/i) && cellStr.length < 20) {
+                      // Day patterns but not too long (to avoid picking up other text)
+                      if (schedule === 'TBD') {
+                        schedule = cellStr;
+                      } else {
+                        schedule = `${cellStr} - ${schedule}`;
+                      }
+                    } else if (cellStr.match(/\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}/)) {
+                      // Time range without AM/PM
+                      schedule = cellStr;
+                    }
+                  });
+
+                  // Extract location (look for room/building patterns)
+                  row.forEach(cell => {
+                    if (!cell) return;
+                    const cellStr = cell.toString().trim();
+                    const cellLower = cellStr.toLowerCase();
+                    
+                    // Look for location indicators
+                    if (cellLower.includes('room') || 
+                        cellLower.includes('lab') || 
+                        cellLower.includes('building') ||
+                        cellStr.match(/^[A-Z]{2,5}\d*/i) || // Pattern like "CNLab", "ROOM101"
+                        cellLower.includes('cnlab') ||
+                        cellLower.includes('library') ||
+                        cellLower.includes('auditorium')) {
+                      location = cellStr;
+                    }
+                  });
+                }
+
+                // Clean up extracted data
+                if (schedule !== 'TBD') {
+                  schedule = schedule.replace(/\s+/g, ' ').trim();
+                }
+                if (location !== 'TBD') {
+                  location = location.replace(/\s+/g, ' ').trim();
                 }
 
                 // Extract student data
@@ -336,7 +390,7 @@ export default function CourseNavBar({
                   throw new Error(`No valid student records found in ${file.name}. Please check the file format.`);
                 }
 
-                // Send to backend
+                // Send to backend with schedule and location
                 const token = localStorage.getItem("auth_token");
                 const response = await fetch(`${API_BASE_URL}/students/import-csv`, {
                   method: 'POST',
@@ -350,6 +404,8 @@ export default function CourseNavBar({
                     course_info: {
                       course_code: courseCode,
                       course_name: courseCode,
+                      schedule: schedule,
+                      location: location,
                       teacher_name: rows[2] && rows[2][4] ? rows[2][4].toString().trim() : null
                     }
                   }),

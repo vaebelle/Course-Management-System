@@ -79,11 +79,7 @@ export default function AddStudent({
         });
         setIsPopupOpen(false);
         
-        // Optional: Show success message
         alert('Student added successfully!');
-        
-        // Optional: Trigger a refresh of the student list
-        // You might want to call a callback function here to refresh the parent component
         
       } else {
         // Handle validation errors or other errors

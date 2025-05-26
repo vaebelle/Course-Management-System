@@ -74,6 +74,329 @@ class StudentController extends Controller
     }
 
     /**
+     * Store a newly created student
+     */
+    public function store(Request $request): JsonResponse
+    {
+        try {
+            $instructor = Auth::user();
+            
+            if (!$instructor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - Please login first'
+                ], 401);
+            }
+
+            $request->validate([
+                'student_id' => 'required|integer',
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'program' => 'required|string|max:255',
+                'enrolled_course' => 'required|string|max:255',
+            ]);
+
+            // Check if student already exists in this course
+            $existingStudent = Student::withTrashed()
+                ->where('student_id', $request->student_id)
+                ->where('enrolled_course', $request->enrolled_course)
+                ->first();
+
+            if ($existingStudent) {
+                if ($existingStudent->trashed()) {
+                    // Restore the soft-deleted student
+                    $existingStudent->restore();
+                    $existingStudent->update([
+                        'first_name' => $request->first_name,
+                        'last_name' => $request->last_name,
+                        'program' => $request->program,
+                        'enrolled_by_instructor' => $instructor->teacher_id,
+                    ]);
+                    
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Student restored and updated successfully',
+                        'data' => $existingStudent
+                    ], 200);
+                } else {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Student already exists in this course'
+                    ], 422);
+                }
+            }
+
+            // Verify the course belongs to this instructor
+            $course = Course::where('course_code', $request->enrolled_course)
+                ->where('assigned_teacher', $instructor->teacher_id)
+                ->first();
+
+            if (!$course) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Course not found or you do not have permission to enroll students'
+                ], 403);
+            }
+
+            // Create new student
+            $student = Student::create([
+                'student_id' => $request->student_id,
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'program' => $request->program,
+                'enrolled_course' => $request->enrolled_course,
+                'enrolled_by_instructor' => $instructor->teacher_id,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Student added successfully',
+                'data' => $student
+            ], 201);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to add student',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Display the specified student
+     */
+    public function show($id): JsonResponse
+    {
+        try {
+            $instructor = Auth::user();
+            
+            if (!$instructor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - Please login first'
+                ], 401);
+            }
+
+            $student = Student::withTrashed()
+                ->where('student_id', $id)
+                ->where('enrolled_by_instructor', $instructor->teacher_id)
+                ->first();
+
+            if (!$student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student not found or you do not have access'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $student,
+                'message' => 'Student retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve student',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update the specified student
+     */
+    public function update(Request $request, $id): JsonResponse
+    {
+        try {
+            $instructor = Auth::user();
+            
+            if (!$instructor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - Please login first'
+                ], 401);
+            }
+
+            $request->validate([
+                'first_name' => 'sometimes|required|string|max:255',
+                'last_name' => 'sometimes|required|string|max:255',
+                'program' => 'sometimes|required|string|max:255',
+            ]);
+
+            $student = Student::withTrashed()
+                ->where('student_id', $id)
+                ->where('enrolled_by_instructor', $instructor->teacher_id)
+                ->first();
+
+            if (!$student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student not found or you do not have permission to update'
+                ], 404);
+            }
+
+            $student->update($request->only(['first_name', 'last_name', 'program']));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Student updated successfully',
+                'data' => $student
+            ]);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update student',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Soft delete the specified student
+     */
+    public function destroy($id): JsonResponse
+    {
+        try {
+            $instructor = Auth::user();
+            
+            if (!$instructor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - Please login first'
+                ], 401);
+            }
+
+            $student = Student::where('student_id', $id)
+                ->where('enrolled_by_instructor', $instructor->teacher_id)
+                ->first();
+
+            if (!$student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student not found or you do not have permission to remove'
+                ], 404);
+            }
+
+            $student->delete(); // Soft delete
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Student removed from course successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove student',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Restore a soft-deleted student
+     */
+    public function restore($id): JsonResponse
+    {
+        try {
+            $instructor = Auth::user();
+            
+            if (!$instructor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - Please login first'
+                ], 401);
+            }
+
+            $student = Student::onlyTrashed()
+                ->where('student_id', $id)
+                ->where('enrolled_by_instructor', $instructor->teacher_id)
+                ->first();
+
+            if (!$student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student not found or already active'
+                ], 404);
+            }
+
+            $student->restore();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Student restored successfully',
+                'data' => $student
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to restore student',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Force delete the specified student (permanent deletion)
+     */
+    public function forceDelete($id): JsonResponse
+    {
+        try {
+            $instructor = Auth::user();
+            
+            if (!$instructor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - Please login first'
+                ], 401);
+            }
+
+            $student = Student::withTrashed()
+                ->where('student_id', $id)
+                ->where('enrolled_by_instructor', $instructor->teacher_id)
+                ->first();
+
+            if (!$student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student not found or you do not have permission'
+                ], 404);
+            }
+
+            $student->forceDelete(); // Permanent deletion
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Student permanently deleted'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to permanently delete student',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Import students from CSV data
      */
     public function importFromCsv(Request $request): JsonResponse
@@ -100,6 +423,8 @@ class StudentController extends Controller
                 'course_info.course_code' => 'sometimes|string|max:255',
                 'course_info.course_name' => 'sometimes|string|max:255',
                 'course_info.teacher_name' => 'sometimes|string|max:255',
+                'course_info.schedule' => 'sometimes|string|max:255',
+                'course_info.location' => 'sometimes|string|max:255',
             ]);
 
             $students = $request->input('students');
@@ -249,14 +574,31 @@ class StudentController extends Controller
                 if (!$instructorCourse) {
                     // Instructor doesn't have this course yet, create/assign it
                     $courseName = $courseInfo['course_name'] ?? $courseCode;
+                    $schedule = $courseInfo['schedule'] ?? 'TBD';
+                    $location = $courseInfo['location'] ?? 'TBD';
                     
                     Course::create([
                         'course_code' => $courseCode,
                         'course_name' => $courseName,
                         'assigned_teacher' => $instructor->teacher_id,
+                        'schedule' => $schedule,
+                        'location' => $location,
                     ]);
                     
                     $courseCreated = true;
+                } else {
+                    // Course exists, update schedule and location if provided
+                    $updateData = [];
+                    if (isset($courseInfo['schedule']) && $courseInfo['schedule'] !== 'TBD') {
+                        $updateData['schedule'] = $courseInfo['schedule'];
+                    }
+                    if (isset($courseInfo['location']) && $courseInfo['location'] !== 'TBD') {
+                        $updateData['location'] = $courseInfo['location'];
+                    }
+                    
+                    if (!empty($updateData)) {
+                        $instructorCourse->update($updateData);
+                    }
                 }
             }
 
@@ -399,6 +741,8 @@ class StudentController extends Controller
                 'imports.*.students.*.program' => 'required|string|max:255',
                 'imports.*.students.*.enrolled_course' => 'required|string|max:255',
                 'imports.*.course_info' => 'sometimes|array',
+                'imports.*.course_info.schedule' => 'sometimes|string|max:255',
+                'imports.*.course_info.location' => 'sometimes|string|max:255',
             ]);
 
             $imports = $request->input('imports');
@@ -543,12 +887,30 @@ class StudentController extends Controller
         
         if (!$instructorCourse) {
             $courseName = $courseInfo['course_name'] ?? $courseCode;
+            $schedule = $courseInfo['schedule'] ?? 'TBD';
+            $location = $courseInfo['location'] ?? 'TBD';
+            
             Course::create([
                 'course_code' => $courseCode,
                 'course_name' => $courseName,
                 'assigned_teacher' => $instructor->teacher_id,
+                'schedule' => $schedule,
+                'location' => $location,
             ]);
             $courseCreated = true;
+        } else {
+            // Update schedule and location if provided
+            $updateData = [];
+            if (isset($courseInfo['schedule']) && $courseInfo['schedule'] !== 'TBD') {
+                $updateData['schedule'] = $courseInfo['schedule'];
+            }
+            if (isset($courseInfo['location']) && $courseInfo['location'] !== 'TBD') {
+                $updateData['location'] = $courseInfo['location'];
+            }
+            
+            if (!empty($updateData)) {
+                $instructorCourse->update($updateData);
+            }
         }
 
         // Import valid students
@@ -644,8 +1006,8 @@ class StudentController extends Controller
                 'instructor_email' => $course->instructor ? $course->instructor->email : null,
                 'semester' => '2ND SEMESTER AY 2024-2025',
                 'group' => 'Group 3',
-                'schedule' => 'FSat - 10:30 AM - 01:30 PM',
-                'location' => 'CNLab',
+                'schedule' => $course->schedule ?? 'TBD',
+                'location' => $course->location ?? 'TBD',
                 'enrolled_count' => $students->whereNull('deleted_at')->count(),
                 'total_students' => $students->count(),
                 'created_at' => $course->created_at->setTimezone('Asia/Manila')->toISOString(),

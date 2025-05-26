@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('program');
             $table->string('enrolled_course'); // FK to course_code
             $table->timestamps();
-            $table->softDeletes(); // This adds the deleted_at column
+            $table->softDeletes();
 
             // Foreign key: enrolled_course → courses.course_code
             $table->foreign('enrolled_course')
