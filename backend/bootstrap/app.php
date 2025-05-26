@@ -17,10 +17,6 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\Cors::class,
         ]);
         
-        // Optional: Add to all routes
-        // $middleware->use([
-        //     \App\Http\Middleware\Cors::class,
-        // ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

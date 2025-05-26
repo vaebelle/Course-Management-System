@@ -7,7 +7,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-// FIXED: Changed class name from 'Instructors' to 'Instructor' (singular)
 class Instructor extends Authenticatable
 {
     use HasFactory, Notifiable, HasApiTokens;

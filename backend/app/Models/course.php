@@ -17,6 +17,8 @@ class Course extends Model
         'course_code',
         'course_name',
         'assigned_teacher',
+        'schedule',    
+        'location',     
     ];
 
     protected $casts = [
