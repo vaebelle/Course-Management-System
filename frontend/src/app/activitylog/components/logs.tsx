@@ -1,15 +1,7 @@
 'use client';
 
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../../../components/ui/table";
 import { useState, useEffect } from "react";
+import { Search, FileText, RefreshCw } from 'lucide-react';
 
 interface ActivityEntry {
   id: string;
@@ -21,6 +13,8 @@ interface ActivityEntry {
   description: string;
   details?: string;
 }
+
+
 
 interface Student {
   student_id: string;
@@ -55,14 +49,26 @@ interface PaginatedStudentResponse {
 
 export default function ActivityList() {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
+  const [filteredActivities, setFilteredActivities] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const API_BASE_URL = 'http://localhost:8000/api';
 
   useEffect(() => {
     fetchAllActivities();
   }, []);
+
+  useEffect(() => {
+    // Filter activities based on search term
+    const filtered = activities.filter(activity =>
+      activity.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.action.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredActivities(filtered);
+  }, [searchTerm, activities]);
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -205,15 +211,15 @@ export default function ActivityList() {
   const getActionColor = (action: string) => {
     switch (action) {
       case 'created':
-        return 'text-green-600 bg-green-50';
+        return 'bg-green-100 text-green-800';
       case 'updated':
-        return 'text-blue-600 bg-blue-50';
+        return 'bg-blue-100 text-blue-800';
       case 'deleted':
-        return 'text-red-600 bg-red-50';
+        return 'bg-red-100 text-red-800';
       case 'restored':
-        return 'text-purple-600 bg-purple-50';
+        return 'bg-purple-100 text-purple-800';
       default:
-        return 'text-gray-600 bg-gray-50';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -232,12 +238,27 @@ export default function ActivityList() {
     }
   };
 
+  const getTypeIcon = (type: string) => {
+    return type === 'course' ? '📚' : '👤';
+  };
+
   // Loading state
   if (loading) {
     return (
-      <div className="w-full max-w-2xl mx-auto bg-white p-4">
-        <div className="flex justify-center items-center py-8">
-          <div className="text-lg">Loading activities...</div>
+      <div className="w-full max-w-6xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+        <div className="bg-green-600 text-white p-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-white bg-opacity-20 rounded flex items-center justify-center">
+              <span className="text-sm">📋</span>
+            </div>
+            <h2 className="text-lg font-semibold">Activity Logs</h2>
+          </div>
+        </div>
+        <div className="flex justify-center items-center py-16">
+          <div className="flex items-center space-x-2 text-gray-600">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+            <span className="text-lg">Loading activities...</span>
+          </div>
         </div>
       </div>
     );
@@ -246,31 +267,23 @@ export default function ActivityList() {
   // Error state
   if (error) {
     return (
-      <div className="w-full max-w-2xl mx-auto bg-white p-4">
-        <div className="flex flex-col items-center justify-center py-8">
-          <div className="text-red-500 mb-4">Error: {error}</div>
-          <button 
-            onClick={fetchAllActivities}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Retry
-          </button>
+      <div className="w-full max-w-6xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+        <div className="bg-green-600 text-white p-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-white bg-opacity-20 rounded flex items-center justify-center">
+              <span className="text-sm">📋</span>
+            </div>
+            <h2 className="text-lg font-semibold">Activity Logs</h2>
+          </div>
         </div>
-      </div>
-    );
-  }
-
-  // No activities state
-  if (activities.length === 0) {
-    return (
-      <div className="w-full max-w-2xl mx-auto bg-white p-4">
-        <div className="flex flex-col items-center justify-center py-8">
-          <div className="text-gray-500 mb-4">No activities found</div>
+        <div className="flex flex-col items-center justify-center py-16">
+          <div className="text-red-500 mb-4 text-lg">Error: {error}</div>
           <button 
             onClick={fetchAllActivities}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium transition-colors flex items-center space-x-2"
           >
-            Refresh
+            <RefreshCw className="w-4 h-4" />
+            <span>Retry</span>
           </button>
         </div>
       </div>
@@ -278,24 +291,121 @@ export default function ActivityList() {
   }
 
   return (
-    <Table className="w-full max-w-2xl mx-auto bg-white">
-      <TableCaption>A list of your recent activities ({activities.length} total).</TableCaption>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-[100px]">Date</TableHead>
-          <TableHead>Activity</TableHead>
-          <TableHead>Time</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {activities.map((entry) => (
-          <TableRow key={entry.id}>
-            <TableCell className="font-medium">{entry.formattedDate}</TableCell>
-            <TableCell>{entry.description}</TableCell>
-            <TableCell>{entry.formattedTime}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <div className="w-full max-w-6xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+      {/* Header Section */}
+      <div className="bg-green-600 text-white p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-white bg-opacity-20 rounded flex items-center justify-center">
+              <span className="text-sm">📋</span>
+            </div>
+            <h2 className="text-lg font-semibold">Activity Logs ({filteredActivities.length})</h2>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={fetchAllActivities}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center space-x-1 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Table Section */}
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-gray-50 border-b">
+              <th className="text-left py-3 px-4 font-medium text-gray-700 text-sm uppercase tracking-wide">
+                Type
+              </th>
+              <th className="text-left py-3 px-4 font-medium text-gray-700 text-sm uppercase tracking-wide">
+                Action
+              </th>
+              <th className="text-left py-3 px-4 font-medium text-gray-700 text-sm uppercase tracking-wide">
+                Description
+              </th>
+              <th className="text-left py-3 px-4 font-medium text-gray-700 text-sm uppercase tracking-wide">
+                Date
+              </th>
+              <th className="text-left py-3 px-4 font-medium text-gray-700 text-sm uppercase tracking-wide">
+                Time
+              </th>
+              <th className="text-left py-3 px-4 font-medium text-gray-700 text-sm uppercase tracking-wide">
+                Details
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredActivities.map((activity, index) => (
+              <tr key={activity.id} className={`border-b hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}>
+                <td className="py-3 px-4 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg">{getTypeIcon(activity.type)}</span>
+                    <span className="font-medium text-gray-900 capitalize">{activity.type}</span>
+                  </div>
+                </td>
+                <td className="py-3 px-4">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm">{getActionIcon(activity.action)}</span>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getActionColor(activity.action)}`}>
+                      {activity.action.charAt(0).toUpperCase() + activity.action.slice(1)}
+                    </span>
+                  </div>
+                </td>
+                <td className="py-3 px-4 text-sm text-gray-900 font-medium max-w-xs">
+                  <div className="truncate" title={activity.description}>
+                    {activity.description}
+                  </div>
+                </td>
+                <td className="py-3 px-4 text-sm text-gray-600">
+                  {activity.formattedDate}
+                </td>
+                <td className="py-3 px-4 text-sm text-gray-600">
+                  {activity.formattedTime}
+                </td>
+                <td className="py-3 px-4 text-sm text-gray-500 max-w-xs">
+                  <div className="truncate" title={activity.details}>
+                    {activity.details || 'No additional details'}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Empty State */}
+      {filteredActivities.length === 0 && !loading && (
+        <div className="text-center py-16 text-gray-500">
+          <div className="text-6xl mb-4">📋</div>
+          <p className="text-lg mb-2">No activities found</p>
+          <p className="text-sm">
+            {searchTerm ? 'Try adjusting your search terms' : 'No recent activities to display'}
+          </p>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="bg-gray-50 px-4 py-3 border-t">
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <span>
+            Showing {filteredActivities.length} of {activities.length} activities
+            {searchTerm && ` (filtered by "${searchTerm}")`}
+          </span>
+          <div className="flex items-center space-x-2">
+            <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 transition-colors">
+              Previous
+            </button>
+            <span className="px-3 py-1 bg-green-600 text-white rounded text-sm">1</span>
+            <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 transition-colors">
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

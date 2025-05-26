@@ -7,12 +7,8 @@ export default function ActivityLog() {
     <>
       <CourseNavBar instructorName="Bea Belle Therese B. Caños" />
       <section>
-        <div className="flex min-h-screen bg-[#ffffff]">
-          <div className="w-full flex justify-center items-start pt-10">
-            <Card className="w-3xl flex justify-center items-start pt-10">
-              <ActivityList />
-            </Card>
-          </div>
+        <div className="min-h-screen bg-[#ffffff] px-4 py-10">
+          <ActivityList />
         </div>
       </section>
     </>
