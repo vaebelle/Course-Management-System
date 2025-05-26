@@ -14,8 +14,7 @@ import {
 } from 'lucide-react';
 
 interface Student {
-  id: number;
-  student_id: number;
+  student_id: number; // Use student_id as primary key instead of id
   first_name: string;
   last_name: string;
   program: string;
@@ -134,8 +133,7 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
         group: result.data.group,
         enrolled_count: result.data.enrolled_count,
         students: result.data.students.map((student: any) => ({
-          id: student.id,
-          student_id: student.student_id,
+          student_id: student.student_id, // Use student_id instead of id
           first_name: student.first_name,
           last_name: student.last_name,
           program: student.program,
@@ -340,7 +338,7 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                         </tr>
                       ) : (
                         filteredStudents.map((student, index) => (
-                          <tr key={student.id} className="hover:bg-green-50 transition-colors">
+                          <tr key={student.student_id} className="hover:bg-green-50 transition-colors">
                             <td className="px-4 py-3 text-sm font-mono text-gray-900 font-medium">
                               {student.student_id}
                             </td>
