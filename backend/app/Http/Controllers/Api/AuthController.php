@@ -1,115 +1,173 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use App\Models\Instructor;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    public function signup(Request $request)
+    /**
+     * Register a new instructor
+     */
+    public function signup(Request $request): JsonResponse
     {
         try {
-            $data = $request->validate([
-                "teacher_id" => "required|unique:instructors,teacher_id",
-                "email" => "required|email|unique:instructors,email",
-                "first_name" => "required|string|max:255",
-                "last_name" => "required|string|max:255",
-                "password" => "required",
+            $request->validate([
+                'teacher_id' => 'required|integer|unique:instructors,teacher_id',
+                'email' => 'required|email|unique:instructors,email',
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'password' => 'required|string|min:6',
             ]);
 
-            // Hash the password
-            $data['password'] = Hash::make($data['password']);
-            
-            $user = Instructor::create($data);
-            
+            $instructor = Instructor::create([
+                'teacher_id' => $request->teacher_id,
+                'email' => $request->email,
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'password' => Hash::make($request->password),
+            ]);
+
+            // Create token for immediate login
+            $token = $instructor->createToken('instructor-token')->plainTextToken;
+
             return response()->json([
-                "status" => true,
-                "message" => "Instructor registered successfully",
-                "user" => $user
+                'success' => true,
+                'message' => 'Instructor registered successfully',
+                'user' => [
+                    'teacher_id' => $instructor->teacher_id,
+                    'email' => $instructor->email,
+                    'first_name' => $instructor->first_name,
+                    'last_name' => $instructor->last_name,
+                ],
+                'token' => $token,
             ], 201);
 
         } catch (ValidationException $e) {
             return response()->json([
-                "status" => false,
-                "message" => "Validation failed",
-                "errors" => $e->errors()
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
-                "status" => false,
-                "message" => "Registration failed: " . $e->getMessage()
+                'success' => false,
+                'message' => 'Registration failed',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
 
-    public function login(Request $request)
+    /**
+     * Login instructor
+     */
+    public function login(Request $request): JsonResponse
     {
         try {
-            $data = $request->validate([
-                "email" => "required|email",
-                "password" => "required",
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required|string',
             ]);
 
-            // Find instructor by email
-            $instructor = Instructor::where('email', $data['email'])->first();
+            $instructor = Instructor::where('email', $request->email)->first();
 
-            if (!$instructor || !Hash::check($data['password'], $instructor->password)) {
+            if (!$instructor || !Hash::check($request->password, $instructor->password)) {
                 return response()->json([
-                    "status" => false,
-                    "message" => "Invalid credentials",
+                    'success' => false,
+                    'message' => 'Invalid credentials'
                 ], 401);
             }
 
             // Create token
-            $token = $instructor->createToken("auth_token")->plainTextToken;
-            
+            $token = $instructor->createToken('instructor-token')->plainTextToken;
+
             return response()->json([
-                "status" => true,
-                "message" => "User logged in successfully",
-                "token" => $token,
-                "user" => $instructor
+                'success' => true,
+                'message' => 'Login successful',
+                'user' => [
+                    'teacher_id' => $instructor->teacher_id,
+                    'email' => $instructor->email,
+                    'first_name' => $instructor->first_name,
+                    'last_name' => $instructor->last_name,
+                ],
+                'token' => $token,
             ], 200);
 
         } catch (ValidationException $e) {
             return response()->json([
-                "status" => false,
-                "message" => "Validation failed",
-                "errors" => $e->errors()
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
-                "status" => false,
-                "message" => "Login failed: " . $e->getMessage()
-            ], 500);
-        }
-    }
-    
-    public function logout(Request $request)
-    {
-        try {
-            $request->user()->currentAccessToken()->delete();
-            
-            return response()->json([
-                "status" => true,
-                "message" => "User logged out successfully",
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                "status" => false,
-                "message" => "Logout failed: " . $e->getMessage()
+                'success' => false,
+                'message' => 'Login failed',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
 
-    public function user(Request $request)
+    /**
+     * Get current authenticated user
+     */
+    public function user(Request $request): JsonResponse
     {
-        return response()->json([
-            "status" => true,
-            "user" => $request->user()
-        ], 200);
+        try {
+            $instructor = Auth::user();
+
+            if (!$instructor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized'
+                ], 401);
+            }
+
+            return response()->json([
+                'success' => true,
+                'user' => [
+                    'teacher_id' => $instructor->teacher_id,
+                    'email' => $instructor->email,
+                    'first_name' => $instructor->first_name,
+                    'last_name' => $instructor->last_name,
+                ],
+                'message' => 'User data retrieved successfully'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve user data',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Logout instructor
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        try {
+            $request->user()->currentAccessToken()->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Logged out successfully'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Logout failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

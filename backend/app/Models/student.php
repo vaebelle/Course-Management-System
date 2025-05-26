@@ -10,17 +10,13 @@ class Student extends Model
 {
     use HasFactory, SoftDeletes;
 
-    // Remove custom primary key settings since we're using default 'id' now
-    // protected $primaryKey = 'student_id';
-    // public $incrementing = false;
-    // protected $keyType = 'integer';
-
     protected $fillable = [
         'student_id',
         'first_name',
         'last_name',
         'program',
         'enrolled_course',
+        'enrolled_by_instructor', // Add this new field
     ];
 
     // Define the deleted_at column for soft deletes
@@ -28,6 +24,7 @@ class Student extends Model
 
     protected $casts = [
         'student_id' => 'integer',
+        'enrolled_by_instructor' => 'integer',
         'deleted_at' => 'datetime',
     ];
 
@@ -37,6 +34,14 @@ class Student extends Model
     public function course()
     {
         return $this->belongsTo(Course::class, 'enrolled_course', 'course_code');
+    }
+
+    /**
+     * Get the instructor who enrolled this student
+     */
+    public function enrolledByInstructor()
+    {
+        return $this->belongsTo(Instructor::class, 'enrolled_by_instructor', 'teacher_id');
     }
 
     /**
@@ -92,8 +97,15 @@ class Student extends Model
      */
     public function scopeForInstructor($query, $teacherId)
     {
-        return $query->whereHas('course', function ($courseQuery) use ($teacherId) {
-            $courseQuery->where('assigned_teacher', $teacherId);
-        });
+        return $query->where('enrolled_by_instructor', $teacherId);
+    }
+
+    /**
+     * Scope to get students enrolled by a specific instructor in a specific course
+     */
+    public function scopeForInstructorAndCourse($query, $teacherId, $courseCode)
+    {
+        return $query->where('enrolled_by_instructor', $teacherId)
+                    ->where('enrolled_course', $courseCode);
     }
 }

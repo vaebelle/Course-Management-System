@@ -13,7 +13,7 @@ Route::post('/instructor/login', [AuthController::class, 'login']);
 Route::group(['middleware' => ['auth:sanctum']], function () {
     // User routes
     Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/user', [AuthController::class, 'user']);
+    Route::get('/user', [AuthController::class, 'user']); // This is the endpoint your frontend is calling
     
     // Course routes - all require authentication
     Route::prefix('courses')->group(function () {

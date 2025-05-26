@@ -14,8 +14,6 @@ class CourseFactory extends Factory
         return [
             'course_code' => strtoupper($this->faker->bothify('CS###')),
             'course_name' => $this->faker->sentence(3),
-            'semester' => $this->faker->randomElement(['1st', '2nd']),
-            'group' => $this->faker->randomLetter(),
             'assigned_teacher' => 1, // or Instructor::factory()
         ];
     }

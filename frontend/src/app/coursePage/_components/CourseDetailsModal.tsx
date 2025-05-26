@@ -198,9 +198,6 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                 <h2 className="text-2xl font-bold">
                   {loading ? 'Loading...' : courseDetails?.course_name || courseCode}
                 </h2>
-                <p className="text-green-100">
-                  {loading ? 'Fetching course details...' : courseDetails?.course_code}
-                </p>
               </div>
             </div>
             <button
@@ -278,19 +275,8 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                 <div className="grid md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="text-[#017638] font-medium">Course:</span>
-                    <p className="text-green-900">{courseDetails.course_code} - {courseDetails.course_name}</p>
+                    <p className="text-green-900">{courseDetails.course_code}</p>
                   </div>
-                  <div>
-                    <span className="text-[#017638] font-medium">Semester:</span>
-                    <p className="text-green-900">{courseDetails.semester}</p>
-                  </div>
-                  <div>
-                    <span className="text-[#017638] font-medium">Group:</span>
-                    <p className="text-green-900">{courseDetails.group}</p>
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-green-700">
-                  * Information extracted from uploaded USC class list CSV file
                 </div>
               </div>
 

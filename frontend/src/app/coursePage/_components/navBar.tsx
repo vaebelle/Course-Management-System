@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import type React from "react";
+
 import { LogOut, Upload, User, AlertCircle, CheckCircle, X } from "lucide-react";
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import { Button } from "../../../components/ui/button";
 import {
   Dialog,
@@ -17,6 +19,7 @@ import Papa from "papaparse";
 
 interface CourseNavbarProps {
   instructorName?: string;
+  onCourseUpdate?: () => void; // Add this callback prop
 }
 
 interface StudentData {
@@ -55,12 +58,15 @@ interface UserData {
   last_name: string;
 }
 
-export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
+export default function CourseNavBar({
+  instructorName,
+  onCourseUpdate, // Add this prop
+}: CourseNavbarProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<ImportResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [currentInstructor, setCurrentInstructor] = useState<string>("Instructor");
+  const [currentInstructor, setCurrentInstructor] = useState<string>("Loading...");
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -98,14 +104,15 @@ export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
           router.push("/");
           return;
         }
-        throw new Error('Failed to fetch user data');
+        throw new Error(`Failed to fetch user data: ${response.status}`);
       }
 
       const result = await response.json();
       
       if (result.success && result.user) {
         const userData: UserData = result.user;
-        setCurrentInstructor(`${userData.first_name} ${userData.last_name}`);
+        const fullName = `${userData.first_name} ${userData.last_name}`;
+        setCurrentInstructor(fullName);
         
         // Also store in localStorage for offline access
         localStorage.setItem("user", JSON.stringify(userData));
@@ -114,7 +121,8 @@ export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
         const storedUser = localStorage.getItem("user");
         if (storedUser) {
           const userData: UserData = JSON.parse(storedUser);
-          setCurrentInstructor(`${userData.first_name} ${userData.last_name}`);
+          const fullName = `${userData.first_name} ${userData.last_name}`;
+          setCurrentInstructor(fullName);
         }
       }
     } catch (error) {
@@ -125,10 +133,14 @@ export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
       if (storedUser) {
         try {
           const userData: UserData = JSON.parse(storedUser);
-          setCurrentInstructor(`${userData.first_name} ${userData.last_name}`);
+          const fullName = `${userData.first_name} ${userData.last_name}`;
+          setCurrentInstructor(fullName);
         } catch (parseError) {
           console.error('Error parsing stored user data:', parseError);
+          setCurrentInstructor("Instructor");
         }
+      } else {
+        setCurrentInstructor("Instructor");
       }
     } finally {
       setLoading(false);
@@ -175,7 +187,8 @@ export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
             if (headerRowIndex > 0) {
               const scheduleRow = rows[headerRowIndex - 1];
               const scheduleInfo = scheduleRow.find(cell => 
-                cell && (cell.toString().includes('CPE') || cell.toString().includes('Group'))
+                cell && cell.toString().includes('CPE') || 
+                cell && cell.toString().includes('Group')
               );
               
               if (scheduleInfo) {
@@ -251,9 +264,16 @@ export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
             setUploadResult(result);
             setShowResult(true);
 
+            // Only trigger course refresh if the import was successful
+            // Don't refresh if all students were skipped
             if (result.success) {
               // Reset file input
               event.target.value = '';
+              
+              // Trigger course list refresh if callback is provided
+              if (onCourseUpdate) {
+                onCourseUpdate();
+              }
             }
 
           } catch (error) {
@@ -267,7 +287,7 @@ export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
             setIsUploading(false);
           }
         },
-        error: (error: any) => {
+        error: (error: Error) => {
           console.error('CSV parsing error:', error);
           setUploadResult({
             success: false,
@@ -288,24 +308,44 @@ export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
     }
   };
 
-  const handleLogout = () => {
-    // Clear authentication data
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("user");
-    
-    // Redirect to login page
-    router.push("/");
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem("auth_token");
+      
+      if (token) {
+        // Call logout API to invalidate the token on the server
+        await fetch(`${API_BASE_URL}/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Logout API error:', error);
+      // Continue with local logout even if API fails
+    } finally {
+      // Clear authentication data
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user");
+      
+      // Redirect to login page
+      router.push("/");
+    }
   };
 
   const closeDialog = () => {
     setIsDialogOpen(false);
     setShowResult(false);
     setUploadResult(null);
-    setIsUploading(false);
   };
 
-  // Use prop if provided, otherwise use fetched instructor name
-  const displayName = instructorName || currentInstructor;
+  // Use fetched instructor name if available, otherwise use prop or fallback
+  const displayName = (!loading && currentInstructor !== "Loading..." && currentInstructor !== "Instructor") 
+    ? currentInstructor 
+    : (instructorName || currentInstructor);
 
   return (
     <nav className="bg-[#017638] border-b shadow-sm">
@@ -354,12 +394,12 @@ export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
                         <Input
                           id="file-upload"
                           type="file"
-                          accept=".csv"
+                          accept=".csv,.xlsx,.xls"
                           onChange={handleFileChange}
                           disabled={isUploading}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Accepted formats: University of San Carlos Class List (CSV)
+                          Accepted format: University of San Carlos Class List (CSV)
                         </p>
                       </div>
                       
@@ -393,6 +433,22 @@ export default function CourseNavBar({ instructorName }: CourseNavbarProps) {
                           }`}>
                             {uploadResult.message}
                           </p>
+                          
+                          {/* Additional warning for partial failures */}
+                          {uploadResult.success && uploadResult.summary && 
+                           (uploadResult.summary.errors > 0 || uploadResult.summary.duplicates > 0) && (
+                            <p className="text-sm text-yellow-700 mt-2 font-medium">
+                              ⚠️ Some students were not imported due to errors or duplicates.
+                            </p>
+                          )}
+                          
+                          {/* Special message for complete failure */}
+                          {!uploadResult.success && uploadResult.summary && 
+                           uploadResult.summary.successful === 0 && uploadResult.summary.duplicates > 0 && (
+                            <p className="text-sm text-red-700 mt-2 font-medium">
+                              💡 All students in this class list are already enrolled with other instructors for this course.
+                            </p>
+                          )}
                         </div>
                       </div>
 
