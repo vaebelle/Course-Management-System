@@ -553,7 +553,6 @@ export default function ActivityList() {
       {/* Empty State - Show when no activities */}
       {filteredActivities.length === 0 && !loading && (
         <div className="text-center py-16 text-gray-500">
-          <NotebookPen />
           <p className="text-lg mb-2">No Activity Logs Yet</p>
           <p className="text-sm text-gray-400">
             {searchTerm 

@@ -978,7 +978,6 @@ class StudentController extends Controller
                 ], 404);
             }
 
-            // CRITICAL FIX: Get students ONLY for THIS INSTRUCTOR'S section
             // This prevents Teacher B from seeing Student 123 if they were enrolled by Teacher A
             $students = Student::withTrashed()
                 ->where('enrolled_course', $courseCode)
