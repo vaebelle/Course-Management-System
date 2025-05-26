@@ -5,16 +5,29 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CourseController extends Controller
 {
     /**
-     * Get all courses with instructor information
+     * Get all courses for the authenticated instructor
      */
     public function index()
     {
         try {
+            // Get the authenticated instructor
+            $instructor = Auth::user();
+            
+            if (!$instructor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - Please login first'
+                ], 401);
+            }
+
+            // Only get courses assigned to this instructor
             $courses = Course::with('instructor')
+                ->where('assigned_teacher', $instructor->teacher_id)
                 ->select([
                     'course_code',
                     'course_name',
@@ -55,11 +68,28 @@ class CourseController extends Controller
     }
 
     /**
-     * Get courses for a specific instructor
+     * Get courses for a specific instructor (only if it's the authenticated user)
      */
     public function getByInstructor($teacherId)
     {
         try {
+            $instructor = Auth::user();
+            
+            if (!$instructor) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - Please login first'
+                ], 401);
+            }
+
+            // Ensure instructor can only access their own courses
+            if ($instructor->teacher_id != $teacherId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Forbidden - You can only access your own courses'
+                ], 403);
+            }
+
             $courses = Course::with('instructor')
                 ->where('assigned_teacher', $teacherId)
                 ->get()
