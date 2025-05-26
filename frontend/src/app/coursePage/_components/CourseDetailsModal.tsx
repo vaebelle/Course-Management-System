@@ -244,9 +244,9 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          first_name: editingStudent.first_name,
-          last_name: editingStudent.last_name,
-          program: editingStudent.program
+          first_name: editingStudent.first_name.toUpperCase(),
+          last_name: editingStudent.last_name.toUpperCase(),
+          program: editingStudent.program.toUpperCase()
         }),
       });
 
@@ -258,13 +258,19 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
       const result = await response.json();
       
       if (result.success) {
-        // Update local state
+        // Update local state with uppercase values
         setCourseDetails(prev => {
           if (!prev) return prev;
           
           const updatedStudents = prev.students.map(student => 
             student.student_id === studentId 
-              ? { ...student, ...editingStudent, updated_at: new Date().toISOString() }
+              ? { 
+                  ...student, 
+                  first_name: editingStudent.first_name.toUpperCase(),
+                  last_name: editingStudent.last_name.toUpperCase(),
+                  program: editingStudent.program.toUpperCase(),
+                  updated_at: new Date().toISOString() 
+                }
               : student
           );
           
@@ -424,9 +430,9 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
         },
         body: JSON.stringify({
           student_id: parseInt(newStudent.student_id),
-          first_name: newStudent.first_name,
-          last_name: newStudent.last_name,
-          program: newStudent.program,
+          first_name: newStudent.first_name.toUpperCase(),
+          last_name: newStudent.last_name.toUpperCase(),
+          program: newStudent.program.toUpperCase(),
           enrolled_course: courseCode
         }),
       });
@@ -439,12 +445,12 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
       const result = await response.json();
       
       if (result.success) {
-        // Add to local state
+        // Add to local state with uppercase values
         const newStudentData: Student = {
           student_id: parseInt(newStudent.student_id),
-          first_name: newStudent.first_name,
-          last_name: newStudent.last_name,
-          program: newStudent.program,
+          first_name: newStudent.first_name.toUpperCase(),
+          last_name: newStudent.last_name.toUpperCase(),
+          program: newStudent.program.toUpperCase(),
           enrolled_course: courseCode,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -514,7 +520,7 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-7xl w-full max-h-[95vh] overflow-hidden">
         {/* Notification */}
         {notification && (
@@ -625,7 +631,7 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                         value={newStudent.student_id}
                         onChange={(e) => setNewStudent(prev => ({ ...prev, student_id: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#017638] focus:border-[#017638]"
-                        placeholder="Enter student ID"
+                        placeholder="ENTER STUDENT ID"
                       />
                     </div>
                     
@@ -634,9 +640,10 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                       <input
                         type="text"
                         value={newStudent.first_name}
-                        onChange={(e) => setNewStudent(prev => ({ ...prev, first_name: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#017638] focus:border-[#017638]"
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, first_name: e.target.value.toUpperCase() }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#017638] focus:border-[#017638] uppercase"
                         placeholder="Enter first name"
+                        style={{ textTransform: 'uppercase' }}
                       />
                     </div>
                     
@@ -645,9 +652,10 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                       <input
                         type="text"
                         value={newStudent.last_name}
-                        onChange={(e) => setNewStudent(prev => ({ ...prev, last_name: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#017638] focus:border-[#017638]"
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, last_name: e.target.value.toUpperCase() }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#017638] focus:border-[#017638] uppercase"
                         placeholder="Enter last name"
+                        style={{ textTransform: 'uppercase' }}
                       />
                     </div>
                     
@@ -656,9 +664,10 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                       <input
                         type="text"
                         value={newStudent.program}
-                        onChange={(e) => setNewStudent(prev => ({ ...prev, program: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#017638] focus:border-[#017638]"
+                        onChange={(e) => setNewStudent(prev => ({ ...prev, program: e.target.value.toUpperCase() }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#017638] focus:border-[#017638] uppercase"
                         placeholder="Enter program"
+                        style={{ textTransform: 'uppercase' }}
                       />
                     </div>
                   </div>
@@ -780,9 +789,10 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                                   type="text"
                                   value={editingStudent?.first_name || ''}
                                   onChange={(e) => setEditingStudent(prev => 
-                                    prev ? { ...prev, first_name: e.target.value } : null
+                                    prev ? { ...prev, first_name: e.target.value.toUpperCase() } : null
                                   )}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-[#017638]"
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-[#017638] uppercase"
+                                  style={{ textTransform: 'uppercase' }}
                                 />
                               ) : (
                                 <span className="font-medium">{student.first_name}</span>
@@ -796,9 +806,10 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                                   type="text"
                                   value={editingStudent?.last_name || ''}
                                   onChange={(e) => setEditingStudent(prev => 
-                                    prev ? { ...prev, last_name: e.target.value } : null
+                                    prev ? { ...prev, last_name: e.target.value.toUpperCase() } : null
                                   )}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-[#017638]"
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-[#017638] uppercase"
+                                  style={{ textTransform: 'uppercase' }}
                                 />
                               ) : (
                                 <span className="font-medium">{student.last_name}</span>
@@ -812,9 +823,10 @@ const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
                                   type="text"
                                   value={editingStudent?.program || ''}
                                   onChange={(e) => setEditingStudent(prev => 
-                                    prev ? { ...prev, program: e.target.value } : null
+                                    prev ? { ...prev, program: e.target.value.toUpperCase() } : null
                                   )}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-[#017638]"
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-[#017638] uppercase"
+                                  style={{ textTransform: 'uppercase' }}
                                 />
                               ) : (
                                 <span>{student.program}</span>

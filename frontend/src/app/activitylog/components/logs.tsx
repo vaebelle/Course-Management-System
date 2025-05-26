@@ -1,7 +1,18 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { Search, FileText, RefreshCw } from 'lucide-react';
+import { 
+  Search, 
+  FileText, 
+  RefreshCw, 
+  NotebookPen, 
+  Pencil,
+  SquareCheck ,
+  Trash2,
+  ArchiveRestore,
+  BookType,
+  CircleUserRound,
+  X } from 'lucide-react';
 
 interface ActivityEntry {
   id: string;
@@ -55,6 +66,10 @@ export default function ActivityList() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(23);
+  
+  // Modal state
+  const [selectedActivity, setSelectedActivity] = useState<ActivityEntry | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -183,22 +198,23 @@ export default function ActivityList() {
               const studentName = `${student.first_name} ${student.last_name}`;
               const id_number = `${student.student_id}`;
               
-              // Check if created_at and updated_at are the same
-              if (student.created_at === student.updated_at) {
-                // Student enrolled activity (only when created_at equals updated_at)
-                const createdDateTime = formatDateTime(student.created_at);
-                allActivities.push({
-                  id: `student-${student.student_id}-enrolled`,
-                  type: 'student',
-                  action: 'created',
-                  timestamp: student.created_at,
-                  formattedDate: createdDateTime.formattedDate,
-                  formattedTime: createdDateTime.formattedTime,
-                  description: `Student Enrolled: ${id_number} - ${studentName}`,
-                  details: `ID: ${student.student_id}, Program: ${student.program}, Course: ${student.enrolled_course}`
-                });
-              } else {
-                // Student updated activity (only when created_at is different from updated_at)
+              // Student enrollment activity (when first created)
+              const createdDateTime = formatDateTime(student.created_at);
+              allActivities.push({
+                id: `student-${student.student_id}-enrolled`,
+                type: 'student',
+                action: 'created',
+                timestamp: student.created_at,
+                formattedDate: createdDateTime.formattedDate,
+                formattedTime: createdDateTime.formattedTime,
+                description: `Student Enrolled: ${id_number} - ${studentName}`,
+                details: `ID: ${student.student_id}, Program: ${student.program}, Course: ${student.enrolled_course}`
+              });
+
+              // Student updated activity - only if:
+              // 1. created_at is different from updated_at (meaning it was actually updated)
+              // 2. AND the student is NOT deleted (to avoid showing update when deleting)
+              if (student.created_at !== student.updated_at && !student.deleted_at) {
                 const updatedDateTime = formatDateTime(student.updated_at);
                 allActivities.push({
                   id: `student-${student.student_id}-updated`,
@@ -222,7 +238,7 @@ export default function ActivityList() {
                   timestamp: student.deleted_at,
                   formattedDate: deletedDateTime.formattedDate,
                   formattedTime: deletedDateTime.formattedTime,
-                  description: `Student Deleted: ${studentName}`,
+                  description: `Student Deleted: ${id_number} - ${studentName}`,
                   details: `ID: ${student.student_id}, Soft deleted from system`
                 });
               }
@@ -277,20 +293,30 @@ export default function ActivityList() {
   const getActionIcon = (action: string) => {
     switch (action) {
       case 'created':
-        return '✅';
+        return <SquareCheck  className="text-green-600 w-5 h-5"/>;
       case 'updated':
-        return '✏️';
+        return <Pencil className="text-blue-600 w-5 h-5"/>;
       case 'deleted':
-        return '🗑️';
+        return <Trash2 className="text-red-600 w-5 h-5"/>;
       case 'restored':
-        return '♻️';
+        return <ArchiveRestore className="text-purple-600 w-5 h-5"/>;
       default:
-        return '📝';
+        return <FileText className="text-gray-600 w-5 h-5"/>;
     }
   };
 
   const getTypeIcon = (type: string) => {
-    return type === 'course' ? '📚' : '👤';
+    return type === 'course' ? <BookType className="w-5 h-5"/> : <CircleUserRound className="w-5 h-5"/>;
+  };
+
+  const handleRowClick = (activity: ActivityEntry) => {
+    setSelectedActivity(activity);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedActivity(null);
   };
 
   // Loading state
@@ -299,10 +325,8 @@ export default function ActivityList() {
       <div className="w-full max-w-6xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
         <div className="bg-green-600 text-white p-4">
           <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 bg-white bg-opacity-20 rounded flex items-center justify-center">
-              <span className="text-sm">📋</span>
-            </div>
-            <h2 className="text-lg font-semibold">Activity Logs</h2>
+            <NotebookPen />
+            <h2 className="text-base font-bold">ACTIVITY LOGS</h2>
           </div>
         </div>
         <div className="flex justify-center items-center py-16">
@@ -320,16 +344,15 @@ export default function ActivityList() {
       {/* Header Section */}
       <div className="bg-green-600 text-white p-4">
         <div className="flex items-center justify-between">
+          
           <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 bg-white bg-opacity-20 rounded flex items-center justify-center">
-              <span className="text-sm">📋</span>
-            </div>
-            <h2 className="text-lg font-semibold">Activity Logs ({filteredActivities.length})</h2>
+            <NotebookPen className="w-6 h-6"/>    
+            <h2 className="text-base font-bold">ACTIVITY LOGS ({filteredActivities.length})</h2>
           </div>
           <div className="flex items-center space-x-2">
             <button 
               onClick={fetchAllActivities}
-              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center space-x-1 transition-colors"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center space-x-1 transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
               <span>Refresh</span>
@@ -366,11 +389,17 @@ export default function ActivityList() {
             </thead>
             <tbody>
               {currentActivities.map((activity, index) => (
-                <tr key={activity.id} className={`border-b hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}>
+                <tr 
+                  key={activity.id} 
+                  onClick={() => handleRowClick(activity)}
+                  className={`border-b hover:bg-gray-50 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}
+                >
                   <td className="py-3 px-4 text-sm">
-                    <div className="flex items-center space-x-2">
+                    <div className={`flex items-center space-x-2 ${
+                      activity.type === 'course' ? 'text-[#017638]' : 'text-[#f5c034]'
+                    }`}>
                       <span className="text-lg">{getTypeIcon(activity.type)}</span>
-                      <span className="font-medium text-gray-900 capitalize">{activity.type}</span>
+                      <span className="font-medium capitalize">{activity.type}</span>
                     </div>
                   </td>
                   <td className="py-3 px-4">
@@ -404,10 +433,127 @@ export default function ActivityList() {
         </div>
       )}
 
+      {/* Activity Detail Modal */}
+      {isModalOpen && selectedActivity && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-green-600 text-white p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">{getTypeIcon(selectedActivity.type)}</span>
+                  <h2 className="text-xl font-bold">Activity Details</h2>
+                </div>
+                <button
+                  onClick={closeModal}
+                  className="text-white hover:text-green-200 transition-colors p-1 rounded-full hover:bg-green-700"
+                >
+                  <X className="h-6 w-6 " />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4">
+              {/* Type and Action */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-medium text-gray-600">Type</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${
+                    selectedActivity.type === 'course' ? 'text-[#017638]' : 'text-[#f5c034]'
+                  }`}>
+                    <span className="text-lg">{getTypeIcon(selectedActivity.type)}</span>
+                    <span className="font-semibold capitalize text-lg">{selectedActivity.type}</span>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-medium text-gray-600">Action</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{getActionIcon(selectedActivity.action)}</span>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getActionColor(selectedActivity.action)}`}>
+                      {selectedActivity.action.charAt(0).toUpperCase() + selectedActivity.action.slice(1)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium text-gray-600">Description</span>
+                </div>
+                <p className="text-gray-900 font-medium">{selectedActivity.description}</p>
+              </div>
+
+              {/* Date and Time */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-medium text-gray-600">Date</span>
+                  </div>
+                  <p className="text-gray-900 font-medium">{selectedActivity.formattedDate}</p>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-medium text-gray-600">Time</span>
+                  </div>
+                  <p className="text-gray-900 font-medium">{selectedActivity.formattedTime}</p>
+                </div>
+              </div>
+
+              {/* Details */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium text-gray-600">Additional Details</span>
+                </div>
+                <div className="text-gray-900 max-h-40 overflow-y-auto">
+                  {selectedActivity.details && selectedActivity.details !== 'No additional details available' ? (
+                    // Check if details contains JSON-like course information
+                    selectedActivity.details.includes('Course Code:') ? (
+                      <div className="space-y-1 text-sm">
+                        {selectedActivity.details.split(', ').map((detail, index) => (
+                          <div key={index} className="flex">
+                            <span className="font-medium text-gray-700">{detail}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>{selectedActivity.details}</p>
+                    )
+                  ) : (
+                    <p className="text-gray-500">No additional details available</p>
+                  )}
+                </div>
+              </div>
+
+              
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+              <div className="flex justify-end">
+                <button
+                  onClick={closeModal}
+                  className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Empty State - Show when no activities */}
       {filteredActivities.length === 0 && !loading && (
         <div className="text-center py-16 text-gray-500">
-          <div className="text-6xl mb-4">📋</div>
+          <NotebookPen />
           <p className="text-lg mb-2">No Activity Logs Yet</p>
           <p className="text-sm text-gray-400">
             {searchTerm 
